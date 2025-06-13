@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { generateStudyPlan, type GenerateStudyPlanInput, type GenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
+import { generateStudyPlan, type GenerateStudyPlanInput, type GenerateStudyPlanOutput, type StudyPlanItem } from '@/ai/flows/generate-study-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb } from 'lucide-react';
+import { Loader2, Lightbulb, TableIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function StudyPlanPage() {
   const [formData, setFormData] = useState<GenerateStudyPlanInput>({
@@ -17,7 +18,7 @@ export default function StudyPlanPage() {
     availableTime: '',
     resources: '',
   });
-  const [studyPlan, setStudyPlan] = useState<string | null>(null);
+  const [studyPlanOutput, setStudyPlanOutput] = useState<GenerateStudyPlanOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -36,10 +37,10 @@ export default function StudyPlanPage() {
       return;
     }
     setIsLoading(true);
-    setStudyPlan(null);
+    setStudyPlanOutput(null);
     try {
       const result: GenerateStudyPlanOutput = await generateStudyPlan(formData);
-      setStudyPlan(result.studyPlan);
+      setStudyPlanOutput(result);
     } catch (error) {
       console.error('Error generating study plan:', error);
       toast({
@@ -117,10 +118,13 @@ export default function StudyPlanPage() {
         </div>
       )}
 
-      {studyPlan && (
-        <Card className="max-w-3xl mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
+      {studyPlanOutput && studyPlanOutput.planItems && (
+        <Card className="max-w-4xl mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="font-headline text-2xl text-primary">Your Custom Study Plan</CardTitle>
+            <CardTitle className="font-headline text-2xl text-primary flex items-center">
+              <TableIcon className="mr-2 h-6 w-6" /> 
+              {studyPlanOutput.planTitle || "Your Custom Study Plan"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Alert className="mb-6 bg-primary/10 border-primary/30">
@@ -130,9 +134,36 @@ export default function StudyPlanPage() {
                 Here is your AI-generated study plan. Remember, consistency is key! Adjust as needed and track your progress.
               </AlertDescription>
             </Alert>
-            <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap p-4 bg-muted/50 rounded-md">
-              {studyPlan}
+            
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[120px]">Day</TableHead>
+                    <TableHead className="w-[150px]">Time Slot</TableHead>
+                    <TableHead>Activity</TableHead>
+                    <TableHead className="w-[150px]">Topic</TableHead>
+                    <TableHead className="w-[100px]">Duration</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {studyPlanOutput.planItems.map((item: StudyPlanItem, index: number) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{item.day}</TableCell>
+                      <TableCell>{item.timeSlot}</TableCell>
+                      <TableCell>{item.activity}</TableCell>
+                      <TableCell>{item.topic || '-'}</TableCell>
+                      <TableCell>{item.duration || '-'}</TableCell>
+                      <TableCell>{item.notes || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
+            {studyPlanOutput.planItems.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">No items found in the study plan.</p>
+            )}
           </CardContent>
         </Card>
       )}
