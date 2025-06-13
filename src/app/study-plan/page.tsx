@@ -142,7 +142,7 @@ export default function StudyPlanPage() {
                     <TableHead className="w-[120px]">Day</TableHead>
                     <TableHead className="w-[150px]">Time Slot</TableHead>
                     <TableHead>Activity</TableHead>
-                    <TableHead className="w-[150px]">Topic</TableHead>
+                    <TableHead className="w-[180px]">Topic</TableHead>
                     <TableHead className="w-[100px]">Duration</TableHead>
                     <TableHead>Notes</TableHead>
                   </TableRow>

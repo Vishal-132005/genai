@@ -29,7 +29,7 @@ const StudyPlanItemSchema = z.object({
   day: z.string().describe("Day of the week or date for this study item (e.g., 'Monday', 'Day 1', '2024-07-29')."),
   timeSlot: z.string().describe("Time slot for the activity (e.g., '9:00 AM - 11:00 AM', 'Morning')."),
   activity: z.string().describe("The specific task or activity to be performed."),
-  topic: z.string().optional().describe("The subject or topic covered during this activity."),
+  topic: z.string().optional().describe("The subject or topic covered during this activity (e.g., 'Algebra', 'Photosynthesis')."),
   duration: z.string().optional().describe("Estimated duration for the activity (e.g., '2 hours', '45 minutes')."),
   notes: z.string().optional().describe("Any additional notes or comments for this study item."),
 });
@@ -62,7 +62,7 @@ Return the plan as a JSON object with the following structure:
       "day": "e.g., Monday or Day 1",
       "timeSlot": "e.g., 9:00 AM - 11:00 AM",
       "activity": "e.g., Read Chapter 1: Introduction to Algebra",
-      "topic": "e.g., Algebra",
+      "topic": "e.g., Algebra Fundamentals",
       "duration": "e.g., 2 hours",
       "notes": "e.g., Focus on core concepts"
     },
@@ -70,7 +70,7 @@ Return the plan as a JSON object with the following structure:
   ]
 }
 
-Ensure the "planItems" array contains a list of all study activities. Each item in the array should be an object with "day", "timeSlot", "activity", and optionally "topic", "duration", and "notes".
+Ensure the "planItems" array contains a list of all study activities. Each item in the array should be an object with "day", "timeSlot", "activity", and optionally "topic", "duration", and "notes". Make sure to include relevant topics for each activity.
 
 User Inputs:
 Learning Objectives: {{{learningObjectives}}}
@@ -92,4 +92,3 @@ const generateStudyPlanFlow = ai.defineFlow(
     return output!;
   }
 );
-
