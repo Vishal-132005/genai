@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -19,9 +20,9 @@ const GenerateStudyPlanInputSchema = z.object({
   availableTime: z
     .string()
     .describe('The amount of time the user has available to study.'),
-  resources: z
+  resources: z // User-provided resources, distinct from AI-suggested resources per item
     .string()
-    .describe('The resources the user has available to study.'),
+    .describe('The overall resources the user has available to study (e.g., specific textbooks, course access).'),
 });
 export type GenerateStudyPlanInput = z.infer<typeof GenerateStudyPlanInputSchema>;
 
@@ -31,7 +32,9 @@ const StudyPlanItemSchema = z.object({
   activity: z.string().describe("The specific task or activity to be performed."),
   topic: z.string().optional().describe("The subject or topic covered during this activity (e.g., 'Algebra', 'Photosynthesis')."),
   duration: z.string().optional().describe("Estimated duration for the activity (e.g., '2 hours', '45 minutes')."),
-  notes: z.string().optional().describe("Any additional notes or comments for this study item."),
+  resources: z.array(z.string()).optional().describe("List of specific learning resources relevant to this activity (e.g., 'Book: Chapter 3 of AI Fundamentals', 'Online: Khan Academy video on Neural Networks')."),
+  explanation: z.string().optional().describe("Brief explanation of the core concepts or focus for this activity. What should the user understand after completing it?"),
+  notes: z.string().optional().describe("Any additional general notes, tips, or comments for this study item."),
 });
 export type StudyPlanItem = z.infer<typeof StudyPlanItemSchema>;
 
@@ -51,8 +54,18 @@ const prompt = ai.definePrompt({
   name: 'generateStudyPlanPrompt',
   input: {schema: GenerateStudyPlanInputSchema},
   output: {schema: GenerateStudyPlanOutputSchema},
-  prompt: `You are an AI study plan generator. You will generate a structured study plan for the user based on their learning objectives, available time, and resources.
+  prompt: `You are an AI study plan generator. You will generate a structured study plan for the user based on their learning objectives, available time, and overall resources.
 The plan should be organized like a chart or table, with clear items for each day/time slot.
+
+For each plan item, provide:
+- day: Day of the week or date (e.g., 'Monday', 'Day 1').
+- timeSlot: Time slot for the activity (e.g., '9:00 AM - 11:00 AM').
+- activity: The specific task or activity.
+- topic: (Optional) The subject or topic covered.
+- duration: (Optional) Estimated duration.
+- resources: (Optional) A list of specific learning resources for THIS activity (e.g., "Chapter 3 of 'Calculus Early Transcendentals'", "Khan Academy video on Derivatives").
+- explanation: (Optional) A brief explanation of what the user should focus on or understand from this activity.
+- notes: (Optional) Any additional general notes or tips for this item.
 
 Return the plan as a JSON object with the following structure:
 {
@@ -64,18 +77,20 @@ Return the plan as a JSON object with the following structure:
       "activity": "e.g., Read Chapter 1: Introduction to Algebra",
       "topic": "e.g., Algebra Fundamentals",
       "duration": "e.g., 2 hours",
-      "notes": "e.g., Focus on core concepts"
+      "resources": ["Textbook 'Algebra Simplified' Chapter 1", "Online article on basic algebraic concepts"],
+      "explanation": "Focus on understanding variables, expressions, and basic equation solving.",
+      "notes": "e.g., Focus on core concepts. Take short breaks."
     },
     // ... more items
   ]
 }
 
-Ensure the "planItems" array contains a list of all study activities. Each item in the array should be an object with "day", "timeSlot", "activity", and optionally "topic", "duration", and "notes". Make sure to include relevant topics for each activity.
+Ensure the "planItems" array contains a list of all study activities. Each item in the array should be an object adhering to the schema.
 
 User Inputs:
 Learning Objectives: {{{learningObjectives}}}
 Available Time: {{{availableTime}}}
-Resources: {{{resources}}}
+Overall Resources User Has: {{{resources}}}
 
 Generate the study plan now.
 `,
@@ -92,3 +107,4 @@ const generateStudyPlanFlow = ai.defineFlow(
     return output!;
   }
 );
+

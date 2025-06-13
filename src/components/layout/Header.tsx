@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import NavItem from './NavItem';
 import { BookText } from 'lucide-react';
@@ -16,6 +17,7 @@ export default function Header() {
             <li><NavItem href="/study-plan">Study Plan</NavItem></li>
             <li><NavItem href="/quiz">Quizzes</NavItem></li>
             <li><NavItem href="/summarize">Summarize</NavItem></li>
+            <li><NavItem href="/generate-notes">Generate Notes</NavItem></li>
           </ul>
         </nav>
       </div>

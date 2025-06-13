@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -93,7 +94,7 @@ export default function StudyPlanPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="resources">Available Resources (Optional)</Label>
+              <Label htmlFor="resources">Overall Available Resources (Optional)</Label>
               <Textarea
                 id="resources"
                 name="resources"
@@ -119,7 +120,7 @@ export default function StudyPlanPage() {
       )}
 
       {studyPlanOutput && studyPlanOutput.planItems && (
-        <Card className="max-w-4xl mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
+        <Card className="max-w-6xl mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="font-headline text-2xl text-primary flex items-center">
               <TableIcon className="mr-2 h-6 w-6" /> 
@@ -139,23 +140,33 @@ export default function StudyPlanPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[120px]">Day</TableHead>
-                    <TableHead className="w-[150px]">Time Slot</TableHead>
-                    <TableHead>Activity</TableHead>
-                    <TableHead className="w-[180px]">Topic</TableHead>
-                    <TableHead className="w-[100px]">Duration</TableHead>
-                    <TableHead>Notes</TableHead>
+                    <TableHead className="min-w-[100px]">Day</TableHead>
+                    <TableHead className="min-w-[130px]">Time Slot</TableHead>
+                    <TableHead className="min-w-[200px]">Activity</TableHead>
+                    <TableHead className="min-w-[150px]">Topic</TableHead>
+                    <TableHead className="min-w-[80px]">Duration</TableHead>
+                    <TableHead className="min-w-[200px]">Resources</TableHead>
+                    <TableHead className="min-w-[250px]">Explanation/Focus</TableHead>
+                    <TableHead className="min-w-[180px]">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {studyPlanOutput.planItems.map((item: StudyPlanItem, index: number) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">{item.day}</TableCell>
-                      <TableCell>{item.timeSlot}</TableCell>
-                      <TableCell>{item.activity}</TableCell>
-                      <TableCell>{item.topic || '-'}</TableCell>
-                      <TableCell>{item.duration || '-'}</TableCell>
-                      <TableCell>{item.notes || '-'}</TableCell>
+                      <TableCell className="font-medium align-top">{item.day}</TableCell>
+                      <TableCell className="align-top">{item.timeSlot}</TableCell>
+                      <TableCell className="align-top">{item.activity}</TableCell>
+                      <TableCell className="align-top">{item.topic || '-'}</TableCell>
+                      <TableCell className="align-top">{item.duration || '-'}</TableCell>
+                      <TableCell className="align-top">
+                        {item.resources && item.resources.length > 0 ? (
+                          <ul className="list-disc list-inside space-y-1">
+                            {item.resources.map((res, i) => <li key={i}>{res}</li>)}
+                          </ul>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-pre-wrap">{item.explanation || '-'}</TableCell>
+                      <TableCell className="align-top whitespace-pre-wrap">{item.notes || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -170,3 +181,4 @@ export default function StudyPlanPage() {
     </div>
   );
 }
+
