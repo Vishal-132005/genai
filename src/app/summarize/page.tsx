@@ -23,7 +23,7 @@ export default function SummarizePage() {
     const file = event.target.files?.[0];
     if (!file) {
       setSelectedFileName(null);
-      setDocumentText('');
+      // Do not clear documentText here, allow user to manage it
       return;
     }
 
@@ -48,11 +48,11 @@ export default function SummarizePage() {
           description: `Could not read ${file.name}.`,
           variant: 'destructive',
         });
-        setDocumentText('');
+        // Do not clear documentText here
       };
       reader.readAsText(file);
     } else if (['pdf', 'doc', 'docx'].includes(fileExtension || '')) {
-      setDocumentText(''); // Clear text area for these files
+      // Do not clear documentText for these files, just show the toast.
       toast({
         title: 'File Type Not Directly Supported',
         description: `For ${file.name} (${fileExtension?.toUpperCase()}): Please copy the text from your document and paste it into the text area below for summarization. Direct ${fileExtension?.toUpperCase()} parsing is not yet supported.`,
@@ -60,7 +60,7 @@ export default function SummarizePage() {
         duration: 8000, // Longer duration for important info
       });
     } else {
-      setDocumentText('');
+      // Do not clear documentText for unsupported types either.
       toast({
         title: 'Unsupported File Type',
         description: `Selected file type (${fileExtension?.toUpperCase()}) is not supported. Please use .txt or copy paste content.`,
@@ -111,7 +111,10 @@ export default function SummarizePage() {
       <Card className="max-w-2xl mx-auto shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Summarize Your Text</CardTitle>
-          <CardDescription>Enter text directly, or upload a file.</CardDescription>
+          <CardDescription>
+            Provide text by pasting directly below, or by uploading a file. 
+            (.txt files will populate the text area; for PDF/DOC/DOCX, you'll be guided to copy-paste.)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -144,7 +147,7 @@ export default function SummarizePage() {
                 id="documentText"
                 value={documentText}
                 onChange={(e) => setDocumentText(e.target.value)}
-                placeholder="Paste your long article, notes, or any text here... or upload a .txt file above."
+                placeholder="Paste your document text here. If you upload a .txt file, its content will appear here. For PDF, DOC, or DOCX files, please upload the file first (you'll get instructions), then copy its content and paste it here."
                 required
                 className="min-h-[200px]"
               />
