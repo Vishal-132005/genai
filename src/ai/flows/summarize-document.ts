@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview Summarizes a document into key points.
+ * @fileOverview Summarizes a document provided as a data URI.
  *
  * - summarizeDocument - A function that handles the document summarization process.
  * - SummarizeDocumentInput - The input type for the summarizeDocument function.
@@ -13,9 +13,9 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SummarizeDocumentInputSchema = z.object({
-  documentText: z
+  documentDataUri: z
     .string()
-    .describe('The text content of the document to summarize.'),
+    .describe("The document content as a data URI. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
 });
 export type SummarizeDocumentInput = z.infer<typeof SummarizeDocumentInputSchema>;
 
@@ -32,11 +32,10 @@ const prompt = ai.definePrompt({
   name: 'summarizeDocumentPrompt',
   input: {schema: SummarizeDocumentInputSchema},
   output: {schema: SummarizeDocumentOutputSchema},
-  prompt: `You are an expert summarizer, able to distill complex documents into their key points.
+  prompt: `You are an expert summarizer. Please extract the text content from the following document provided as a data URI and then provide a concise summary of its key points.
 
-  Please summarize the following document:
-
-  {{{documentText}}}
+  Document:
+  {{media url=documentDataUri}}
   `,
 });
 

@@ -4,7 +4,6 @@
 import { useState, type ChangeEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { summarizeDocument, type SummarizeDocumentInput, type SummarizeDocumentOutput } from '@/ai/flows/summarize-document';
@@ -13,7 +12,7 @@ import { Loader2, FileText, Sparkles, Upload } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SummarizePage() {
-  const [documentText, setDocumentText] = useState('');
+  const [documentDataUri, setDocumentDataUri] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -23,60 +22,43 @@ export default function SummarizePage() {
     const file = event.target.files?.[0];
     if (!file) {
       setSelectedFileName(null);
-      // Do not clear documentText here, allow user to manage it
+      setDocumentDataUri(null);
       return;
     }
 
     setSelectedFileName(file.name);
     setSummary(null); // Clear previous summary
+    setDocumentDataUri(null); // Clear previous data URI
 
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-
-    if (fileExtension === 'txt') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        setDocumentText(text);
-        toast({
-          title: "File Loaded",
-          description: `${file.name} content has been loaded into the text area.`,
-        });
-      };
-      reader.onerror = () => {
-        toast({
-          title: 'Error Reading File',
-          description: `Could not read ${file.name}.`,
-          variant: 'destructive',
-        });
-        // Do not clear documentText here
-      };
-      reader.readAsText(file);
-    } else if (['pdf', 'doc', 'docx'].includes(fileExtension || '')) {
-      // Do not clear documentText for these files, just show the toast.
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUri = e.target?.result as string;
+      setDocumentDataUri(dataUri);
       toast({
-        title: 'File Type Not Directly Supported',
-        description: `For ${file.name} (${fileExtension?.toUpperCase()}): Please copy the text from your document and paste it into the text area below for summarization. Direct ${fileExtension?.toUpperCase()} parsing is not yet supported.`,
-        variant: 'default',
-        duration: 8000, // Longer duration for important info
+        title: "File Ready",
+        description: `${file.name} has been loaded and is ready for summarization.`,
       });
-    } else {
-      // Do not clear documentText for unsupported types either.
+    };
+    reader.onerror = () => {
       toast({
-        title: 'Unsupported File Type',
-        description: `Selected file type (${fileExtension?.toUpperCase()}) is not supported. Please use .txt or copy paste content.`,
+        title: 'Error Reading File',
+        description: `Could not read ${file.name}.`,
         variant: 'destructive',
       });
-    }
+      setSelectedFileName(null);
+    };
+    reader.readAsDataURL(file);
+
     // Reset file input value to allow re-uploading the same file
     event.target.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!documentText.trim()) {
+    if (!documentDataUri) {
       toast({
-        title: 'Empty Document',
-        description: 'Please paste some text or upload a .txt file to summarize.',
+        title: 'No File Selected',
+        description: 'Please upload a PDF or DOC file to summarize.',
         variant: 'destructive',
       });
       return;
@@ -84,14 +66,20 @@ export default function SummarizePage() {
     setIsLoading(true);
     setSummary(null);
     try {
-      const input: SummarizeDocumentInput = { documentText };
+      const input: SummarizeDocumentInput = { documentDataUri };
       const result: SummarizeDocumentOutput = await summarizeDocument(input);
       setSummary(result.summary);
     } catch (error) {
       console.error('Error summarizing document:', error);
+      let description = 'Failed to summarize document. Please try again.';
+      if (error instanceof Error && error.message.includes("MEDIA_PROCESSING_FAILED_NO_TEXT_CONTENT")) {
+        description = 'Could not extract text from the uploaded document. The document might be image-based or heavily formatted. Try a different document.';
+      } else if (error instanceof Error && error.message.includes("Schema validation failed")) {
+        description = 'The AI returned an unexpected format. Please try again or with a different document.';
+      }
       toast({
-        title: 'Error',
-        description: 'Failed to summarize document. Please try again.',
+        title: 'Error Summarizing',
+        description,
         variant: 'destructive',
       });
     } finally {
@@ -104,29 +92,28 @@ export default function SummarizePage() {
       <header className="text-center">
         <h1 className="text-4xl font-bold font-headline text-primary">Document Summarizer</h1>
         <p className="text-lg text-muted-foreground mt-2">
-          Paste your document text or upload a .txt file, and let AI extract the key points for you.
+          Upload your PDF or DOC file, and let AI extract the key points for you.
         </p>
       </header>
 
       <Card className="max-w-2xl mx-auto shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="font-headline text-2xl">Summarize Your Text</CardTitle>
+          <CardTitle className="font-headline text-2xl">Upload Your Document</CardTitle>
           <CardDescription>
-            Provide text by pasting directly below, or by uploading a file. 
-            (.txt files will populate the text area; for PDF/DOC/DOCX, you'll be guided to copy-paste.)
+            Select a PDF or DOC file to be summarized by our AI.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="fileUpload" className="flex items-center cursor-pointer">
+              <Label htmlFor="fileUpload" className="flex items-center cursor-pointer text-base">
                 <Upload className="mr-2 h-5 w-5" />
-                Upload File (TXT, PDF, DOC, DOCX)
+                Select PDF or DOC File
               </Label>
               <Input
                 id="fileUpload"
                 type="file"
-                accept=".txt,.pdf,.doc,.docx"
+                accept="application/pdf,application/msword" // Only PDF and DOC
                 onChange={handleFileChange}
                 className="block w-full text-sm text-slate-500 dark:text-slate-400
                            file:mr-4 file:py-2 file:px-4
@@ -140,21 +127,9 @@ export default function SummarizePage() {
                 <p className="text-sm text-muted-foreground mt-1">Selected file: {selectedFileName}</p>
               )}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="documentText">Document Text</Label>
-              <Textarea
-                id="documentText"
-                value={documentText}
-                onChange={(e) => setDocumentText(e.target.value)}
-                placeholder="Paste your document text here. If you upload a .txt file, its content will appear here. For PDF, DOC, or DOCX files, please upload the file first (you'll get instructions), then copy its content and paste it here."
-                required
-                className="min-h-[200px]"
-              />
-            </div>
-            <Button type="submit" disabled={isLoading} className="w-full">
+            <Button type="submit" disabled={isLoading || !documentDataUri} className="w-full">
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Summarize Text
+              Summarize File
             </Button>
           </form>
         </CardContent>
