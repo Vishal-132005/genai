@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,8 +101,8 @@ export default function GenerateNotesPage() {
                 Here are your AI-generated study notes.
               </AlertDescription>
             </Alert>
-            <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap p-4 bg-muted/50 rounded-md border">
-              {generatedNotes}
+            <div className="prose dark:prose-invert max-w-none p-4 bg-muted/50 rounded-md border">
+              <ReactMarkdown>{generatedNotes}</ReactMarkdown>
             </div>
           </CardContent>
         </Card>
