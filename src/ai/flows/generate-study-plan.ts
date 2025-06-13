@@ -67,7 +67,7 @@ For each plan item, provide:
 - explanation: (Optional) A brief explanation of what the user should focus on or understand from this activity.
 - notes: (Optional) Any additional general notes or tips for this item.
 
-Return the plan as a JSON object with the following structure:
+Return the plan as a JSON object with the following structure. Crucially, the top-level JSON object MUST include a 'planTitle' string field and a 'planItems' array.
 {
   "planTitle": "Name of the Study Plan",
   "planItems": [
