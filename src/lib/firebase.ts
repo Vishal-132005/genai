@@ -2,35 +2,19 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 
-// These are the NAMES of the environment variables we expect.
-const essentialEnvVarNames = [
-  "NEXT_PUBLIC_FIREBASE_API_KEY",
-  "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-  "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-  "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-  "NEXT_PUBLIC_FIREBASE_APP_ID",
-  // measurementId is often optional for basic auth, but good to include if used.
-  // "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID", 
-];
-
-const missingVars = essentialEnvVarNames.filter(envVarName => !process.env[envVarName]);
-
-if (missingVars.length > 0) {
-  throw new Error(
-    `Firebase configuration is missing. Please ensure the following environment variables are set in your .env file: ${missingVars.join(', ')}. 
-    You can find these values in your Firebase project settings. Restart your development server after updating the .env file.`
-  );
-}
-
+// Hardcoded Firebase configuration
+// IMPORTANT: This is generally not recommended for production.
+// It's better to use environment variables.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID 
+  apiKey: "AIzaSyAei9vlf3DxfFgGD2zyIdC-mdFSOdXpjQA",
+  authDomain: "geministudy-vvqy8.firebaseapp.com",
+  projectId: "geministudy-vvqy8",
+  storageBucket: "geministudy-vvqy8.appspot.com", // Corrected from firebasestorage.app to appspot.com
+  messagingSenderId: "415709276246",
+  appId: "1:415709276246:web:e55e7840b03f366d5bb3f7",
+  // measurementId is optional for basic auth, but include if used/available.
+  // You might need to fetch this from your Firebase project settings if you intend to use Analytics.
+  // measurementId: "G-YOUR_MEASUREMENT_ID" 
 };
 
 let app: FirebaseApp;
@@ -43,3 +27,4 @@ if (!getApps().length) {
 const auth: Auth = getAuth(app);
 
 export { app, auth };
+
