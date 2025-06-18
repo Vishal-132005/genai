@@ -1,17 +1,27 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { generateStudyPlan, type GenerateStudyPlanInput, type GenerateStudyPlanOutput, type StudyPlanItem } from '@/ai/flows/generate-study-plan';
+import { Checkbox } from '@/components/ui/checkbox';
+import { generateStudyPlan, type GenerateStudyPlanInput, type StudyPlanItem as OriginalStudyPlanItem, type GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb, TableIcon } from 'lucide-react';
+import { Loader2, Lightbulb, TableIcon, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from '@/lib/utils';
+
+interface StudyPlanItem extends OriginalStudyPlanItem {
+  isCompleted?: boolean;
+}
+
+interface GenerateStudyPlanOutput extends OriginalGenerateStudyPlanOutput {
+  planItems: StudyPlanItem[];
+}
 
 export default function StudyPlanPage() {
   const [formData, setFormData] = useState<GenerateStudyPlanInput>({
@@ -40,8 +50,9 @@ export default function StudyPlanPage() {
     setIsLoading(true);
     setStudyPlanOutput(null);
     try {
-      const result: GenerateStudyPlanOutput = await generateStudyPlan(formData);
-      setStudyPlanOutput(result);
+      const result: OriginalGenerateStudyPlanOutput = await generateStudyPlan(formData);
+      const itemsWithCompletion = result.planItems.map(item => ({ ...item, isCompleted: false }));
+      setStudyPlanOutput({ ...result, planItems: itemsWithCompletion });
     } catch (error) {
       console.error('Error generating study plan:', error);
       toast({
@@ -52,6 +63,14 @@ export default function StudyPlanPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleTaskCompletion = (index: number) => {
+    if (!studyPlanOutput) return;
+    const updatedPlanItems = studyPlanOutput.planItems.map((item, i) => 
+      i === index ? { ...item, isCompleted: !item.isCompleted } : item
+    );
+    setStudyPlanOutput({ ...studyPlanOutput, planItems: updatedPlanItems });
   };
 
   return (
@@ -132,7 +151,7 @@ export default function StudyPlanPage() {
               <Lightbulb className="h-5 w-5 text-primary" />
               <AlertTitle className="font-headline text-primary">Study Plan Generated!</AlertTitle>
               <AlertDescription className="text-primary/80">
-                Here is your AI-generated study plan. Remember, consistency is key! Adjust as needed and track your progress.
+                Here is your AI-generated study plan. Mark tasks as complete to track your progress!
               </AlertDescription>
             </Alert>
             
@@ -140,6 +159,7 @@ export default function StudyPlanPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">Status</TableHead>
                     <TableHead className="min-w-[100px]">Day</TableHead>
                     <TableHead className="min-w-[130px]">Time Slot</TableHead>
                     <TableHead className="min-w-[200px]">Activity</TableHead>
@@ -152,21 +172,29 @@ export default function StudyPlanPage() {
                 </TableHeader>
                 <TableBody>
                   {studyPlanOutput.planItems.map((item: StudyPlanItem, index: number) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium align-top">{item.day}</TableCell>
-                      <TableCell className="align-top">{item.timeSlot}</TableCell>
-                      <TableCell className="align-top">{item.activity}</TableCell>
-                      <TableCell className="align-top">{item.topic || '-'}</TableCell>
-                      <TableCell className="align-top">{item.duration || '-'}</TableCell>
+                    <TableRow key={index} className={cn(item.isCompleted && "bg-muted/40")}>
                       <TableCell className="align-top">
+                        <Checkbox
+                          checked={item.isCompleted}
+                          onCheckedChange={() => toggleTaskCompletion(index)}
+                          aria-label={item.isCompleted ? "Mark task as not complete" : "Mark task as complete"}
+                          className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                        />
+                      </TableCell>
+                      <TableCell className={cn("font-medium align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.day}</TableCell>
+                      <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.timeSlot}</TableCell>
+                      <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.activity}</TableCell>
+                      <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.topic || '-'}</TableCell>
+                      <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.duration || '-'}</TableCell>
+                      <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>
                         {item.resources && item.resources.length > 0 ? (
                           <ul className="list-disc list-inside space-y-1">
                             {item.resources.map((res, i) => <li key={i}>{res}</li>)}
                           </ul>
                         ) : '-'}
                       </TableCell>
-                      <TableCell className="align-top whitespace-pre-wrap">{item.explanation || '-'}</TableCell>
-                      <TableCell className="align-top whitespace-pre-wrap">{item.notes || '-'}</TableCell>
+                      <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.explanation || '-'}</TableCell>
+                      <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.notes || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -181,4 +209,3 @@ export default function StudyPlanPage() {
     </div>
   );
 }
-
