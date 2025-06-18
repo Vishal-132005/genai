@@ -52,7 +52,11 @@ export default function VoiceAssistantPage() {
         };
 
         recognitionInstance.onerror = (event) => {
-          console.error('Speech recognition error', event.error);
+          // Log errors to console, except for 'network' errors which are common and handled by a toast
+          if (event.error !== 'network') {
+            console.error('Speech recognition error', event.error);
+          }
+          
           let errorMsg = 'An error occurred during speech recognition.';
           if (event.error === 'no-speech') {
             errorMsg = 'No speech was detected. Please try again.';
@@ -61,7 +65,7 @@ export default function VoiceAssistantPage() {
           } else if (event.error === 'not-allowed') {
             errorMsg = 'Microphone access denied. Please enable microphone permissions in your browser settings.';
           } else if (event.error === 'network') {
-            errorMsg = 'Network error during speech recognition. Please check your internet connection or try again later.';
+            errorMsg = 'A network error occurred during speech recognition. Please check your internet connection or try again later.';
           }
           toast({
             title: 'Speech Error',
@@ -283,4 +287,3 @@ export default function VoiceAssistantPage() {
     </div>
   );
 }
-
