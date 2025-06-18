@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAei9vlf3DxfFgGD2zyIdC-mdFSOdXpjQA",
   authDomain: "geministudy-vvqy8.firebaseapp.com",
   projectId: "geministudy-vvqy8",
-  storageBucket: "geministudy-vvqy8.appspot.com", // Corrected from firebasestorage.app to appspot.com
+  storageBucket: "geministudy-vvqy8.appspot.com", // Corrected to use .appspot.com
   messagingSenderId: "415709276246",
   appId: "1:415709276246:web:e55e7840b03f366d5bb3f7",
   // measurementId is optional for basic auth, but include if used/available.
@@ -27,4 +27,3 @@ if (!getApps().length) {
 const auth: Auth = getAuth(app);
 
 export { app, auth };
-
