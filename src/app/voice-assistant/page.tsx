@@ -60,6 +60,8 @@ export default function VoiceAssistantPage() {
             errorMsg = 'Microphone problem. Ensure it is connected and enabled.';
           } else if (event.error === 'not-allowed') {
             errorMsg = 'Microphone access denied. Please enable microphone permissions in your browser settings.';
+          } else if (event.error === 'network') {
+            errorMsg = 'Network error during speech recognition. Please check your internet connection or try again later.';
           }
           toast({
             title: 'Speech Error',
@@ -128,15 +130,13 @@ export default function VoiceAssistantPage() {
     } else {
       setUserInput('');
       setAssistantResponse(null);
-      speechSynthesis.cancel();
+      if (typeof window !== 'undefined') {
+        speechSynthesis.cancel();
+      }
       try {
-        // Check for permissions before starting, or let the browser handle it.
-        // For simplicity, we let the browser prompt if not already granted.
-        // More robust handling involves navigator.permissions.query({ name: 'microphone' })
         recognitionRef.current.start();
       } catch (error) {
         console.error("Error starting recognition:", error);
-        // This catch handles immediate errors if .start() fails synchronously
         if ((error as DOMException).name === 'NotAllowedError') {
              toast({
                 title: 'Microphone Access Denied',
@@ -150,7 +150,7 @@ export default function VoiceAssistantPage() {
                 variant: 'destructive',
             });
         }
-        setIsRecording(false); // Ensure state consistency
+        setIsRecording(false); 
       }
     }
   };
@@ -160,7 +160,7 @@ export default function VoiceAssistantPage() {
     const currentInput = textOverride || userInput;
 
     if (!currentInput.trim()) {
-      if (!textOverride) { // Only toast for manual empty submits
+      if (!textOverride) { 
         toast({
           title: 'Empty Input',
           description: 'Please type or say something for the assistant.',
@@ -186,7 +186,9 @@ export default function VoiceAssistantPage() {
       });
     } finally {
       setIsLoading(false);
-      setUserInput(''); // Clear input after submission for "live talk" feel
+      if (!textOverride) { // Only clear input if it was a manual submit, not from voice
+        setUserInput(''); 
+      }
     }
   };
 
@@ -270,7 +272,7 @@ export default function VoiceAssistantPage() {
           </CardHeader>
           <CardContent>
              <Alert className="bg-primary/10 border-primary/30">
-                <Mic className="h-5 w-5 text-primary opacity-70" /> {/* Static icon here or could be ChatBubble */}
+                <Mic className="h-5 w-5 text-primary opacity-70" />
                 <AlertDescription className="text-primary/90 whitespace-pre-wrap">
                     {assistantResponse}
                 </AlertDescription>
