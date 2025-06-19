@@ -12,12 +12,22 @@ export interface UserProfile {
   department: string;
   semester: string;
   email?: string;
+  createdAt?: string; // Changed to string
+  lastUpdatedAt?: string; // Changed to string
 }
 
-export async function saveUserProfile(userId: string, profileData: UserProfile): Promise<void> {
+export async function saveUserProfile(userId: string, profileData: Omit<UserProfile, 'createdAt' | 'lastUpdatedAt' | 'email'> & { email?: string }): Promise<void> {
   if (!userId) throw new Error("User ID is required to save user profile.");
   const userProfileRef = doc(db, 'users', userId);
-  await setDoc(userProfileRef, { ...profileData, createdAt: serverTimestamp(), lastUpdatedAt: serverTimestamp() }, { merge: true });
+  const dataToSave: any = { ...profileData, lastUpdatedAt: serverTimestamp() };
+  
+  // Add createdAt only if it's a new document
+  const docSnap = await getDoc(userProfileRef);
+  if (!docSnap.exists()) {
+    dataToSave.createdAt = serverTimestamp();
+  }
+  
+  await setDoc(userProfileRef, dataToSave , { merge: true });
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -25,7 +35,19 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const userProfileRef = doc(db, 'users', userId);
   const docSnap = await getDoc(userProfileRef);
   if (docSnap.exists()) {
-    return docSnap.data() as UserProfile;
+    const data = docSnap.data();
+    const profile: UserProfile = {
+        department: data.department,
+        semester: data.semester,
+        email: data.email,
+    };
+    if (data.createdAt && data.createdAt instanceof Timestamp) {
+        profile.createdAt = data.createdAt.toDate().toISOString();
+    }
+    if (data.lastUpdatedAt && data.lastUpdatedAt instanceof Timestamp) {
+        profile.lastUpdatedAt = data.lastUpdatedAt.toDate().toISOString();
+    }
+    return profile;
   }
   return null;
 }
