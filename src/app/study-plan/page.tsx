@@ -8,15 +8,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateStudyPlan, type GenerateStudyPlanInput, type StudyPlanItem as OriginalStudyPlanItem, type GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb, TableIcon, History, Eye } from 'lucide-react';
+import { Loader2, Lightbulb, TableIcon, History, Eye, BookOpen, ListChecks } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveStudyPlan, getStudyPlans, type StoredStudyPlan } from '@/lib/firestoreService';
+import { saveStudyPlan, getStudyPlans, type StoredStudyPlan, getUserProfile, type UserProfile } from '@/lib/firestoreService';
 import { Timestamp } from 'firebase/firestore';
+import { getDepartments, getSemestersForDepartment, getSubjectsForSemester, getTopicsForSubject, type Topic as AcademicTopic } from '@/lib/academicData';
 
 interface StudyPlanItem extends OriginalStudyPlanItem {
   isCompleted?: boolean;
@@ -28,26 +30,88 @@ interface GenerateStudyPlanOutput extends OriginalGenerateStudyPlanOutput {
 
 export default function StudyPlanPage() {
   const { user } = useAuth();
-  const [formData, setFormData] = useState<GenerateStudyPlanInput>({
-    learningObjectives: '',
-    availableTime: '',
-    resources: '',
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]); // Store topic IDs
+
+  const [availableSemesters, setAvailableSemesters] = useState<{value: string, label: string}[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<{value: string, label: string, topics: AcademicTopic[]}[]>([]);
+  const [availableTopics, setAvailableTopics] = useState<{value: string, label: string}[]>([]);
+
+  const [customLearningObjectives, setCustomLearningObjectives] = useState('');
+  const [availableTime, setAvailableTime] = useState('');
+  const [userResources, setUserResources] = useState('');
+
   const [studyPlanOutput, setStudyPlanOutput] = useState<GenerateStudyPlanOutput | StoredStudyPlan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const { toast } = useToast();
   const [historicalPlans, setHistoricalPlans] = useState<StoredStudyPlan[]>([]);
 
+  const departmentOptions = getDepartments();
+
   useEffect(() => {
-    if (user) {
-      fetchHistoricalPlans();
-    } else {
-      setHistoricalPlans([]);
-      setStudyPlanOutput(null);
-    }
+    const fetchProfileAndPlans = async () => {
+      if (user) {
+        setIsLoadingProfile(true);
+        try {
+          const profile = await getUserProfile(user.uid);
+          setUserProfile(profile);
+          if (profile?.department) setSelectedDepartment(profile.department);
+          if (profile?.semester) setSelectedSemester(profile.semester);
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          toast({ title: "Profile Error", description: "Could not load your profile.", variant: "destructive" });
+        } finally {
+          setIsLoadingProfile(false);
+        }
+        fetchHistoricalPlans();
+      } else {
+        setUserProfile(null);
+        setSelectedDepartment('');
+        setSelectedSemester('');
+        setHistoricalPlans([]);
+        setStudyPlanOutput(null);
+        setIsLoadingProfile(false);
+      }
+    };
+    fetchProfileAndPlans();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (selectedDepartment) {
+      setAvailableSemesters(getSemestersForDepartment(selectedDepartment));
+      if (userProfile?.department !== selectedDepartment) setSelectedSemester(''); // Reset semester if dept changes from profile
+    } else {
+      setAvailableSemesters([]);
+    }
+    setSelectedSubject('');
+    setSelectedTopics([]);
+  }, [selectedDepartment, userProfile?.department]);
+
+  useEffect(() => {
+    if (selectedDepartment && selectedSemester) {
+      setAvailableSubjects(getSubjectsForSemester(selectedDepartment, selectedSemester));
+    } else {
+      setAvailableSubjects([]);
+    }
+    setSelectedSubject('');
+    setSelectedTopics([]);
+  }, [selectedDepartment, selectedSemester]);
+
+  useEffect(() => {
+    if (selectedDepartment && selectedSemester && selectedSubject) {
+      setAvailableTopics(getTopicsForSubject(selectedDepartment, selectedSemester, selectedSubject));
+    } else {
+      setAvailableTopics([]);
+    }
+    setSelectedTopics([]);
+  }, [selectedDepartment, selectedSemester, selectedSubject]);
 
   const fetchHistoricalPlans = async () => {
     if (!user) return;
@@ -57,18 +121,16 @@ export default function StudyPlanPage() {
       setHistoricalPlans(plans);
     } catch (error) {
       console.error('Error fetching historical plans:', error);
-      toast({
-        title: 'Error Fetching History',
-        description: 'Could not load your past study plans.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error Fetching History', description: 'Could not load your past study plans.', variant: 'destructive' });
     } finally {
       setIsLoadingHistory(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleTopicChange = (topicId: string) => {
+    setSelectedTopics(prev => 
+      prev.includes(topicId) ? prev.filter(id => id !== topicId) : [...prev, topicId]
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -77,68 +139,78 @@ export default function StudyPlanPage() {
       toast({ title: 'Not Authenticated', description: 'Please log in to generate and save study plans.', variant: 'destructive' });
       return;
     }
-    if (!formData.learningObjectives || !formData.availableTime) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please fill in learning objectives and available time.',
-        variant: 'destructive',
-      });
-      return;
+    
+    let learningObjectives = customLearningObjectives;
+    if (selectedDepartment && selectedSemester) {
+      const deptName = departmentOptions.find(d => d.value === selectedDepartment)?.label || selectedDepartment;
+      const semName = availableSemesters.find(s => s.value === selectedSemester)?.label || `Semester ${selectedSemester}`;
+      let academicContext = `Academic Focus: ${deptName}, ${semName}.`;
+
+      if (selectedSubject) {
+        const subjName = availableSubjects.find(s => s.value === selectedSubject)?.label || selectedSubject;
+        academicContext += ` Subject: ${subjName}.`;
+        if (selectedTopics.length > 0) {
+          const topicNames = selectedTopics.map(tid => availableTopics.find(t => t.value === tid)?.label || tid).join(', ');
+          academicContext += ` Specific Topics: ${topicNames}.`;
+        }
+      }
+      learningObjectives = academicContext + (customLearningObjectives ? ` Additional Objectives: ${customLearningObjectives}` : '');
     }
+
+    if (!learningObjectives && !availableTime) {
+       toast({ title: 'Missing Information', description: 'Please specify academic focus or custom objectives, and available time.', variant: 'destructive' });
+       return;
+    }
+     if (!availableTime) {
+       toast({ title: 'Missing Information', description: 'Please specify available time.', variant: 'destructive' });
+       return;
+    }
+
+
     setIsLoading(true);
     setStudyPlanOutput(null);
     try {
-      const result: OriginalGenerateStudyPlanOutput = await generateStudyPlan(formData);
+      const input: GenerateStudyPlanInput = {
+        learningObjectives,
+        availableTime,
+        resources: userResources,
+      };
+      const result: OriginalGenerateStudyPlanOutput = await generateStudyPlan(input);
       const itemsWithCompletion = result.planItems.map(item => ({ ...item, isCompleted: false }));
       const fullResult = { ...result, planItems: itemsWithCompletion };
       setStudyPlanOutput(fullResult);
       await saveStudyPlan(user.uid, fullResult);
       toast({ title: 'Plan Saved', description: 'Your new study plan has been saved.' });
-      fetchHistoricalPlans(); // Refresh history
+      fetchHistoricalPlans(); 
     } catch (error) {
       console.error('Error generating study plan:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate study plan. Please try again.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to generate study plan. Please try again.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const toggleTaskCompletion = (index: number) => {
-    if (!studyPlanOutput) return;
-    const updatedPlanItems = studyPlanOutput.planItems.map((item, i) =>
+    if (!studyPlanOutput || !('planItems' in studyPlanOutput)) return; // Type guard for StoredStudyPlan
+    const currentPlanItems = studyPlanOutput.planItems || [];
+    const updatedPlanItems = currentPlanItems.map((item, i) =>
       i === index ? { ...item, isCompleted: !item.isCompleted } : item
     );
-    // Note: This local toggle does not persist to Firestore automatically.
-    // For full persistence of task completion, an update Firestore function would be needed.
     setStudyPlanOutput({ ...studyPlanOutput, planItems: updatedPlanItems });
+    // Note: To persist completion status, an updateStudyPlan Firestore function would be needed.
   };
 
   const viewHistoricalPlan = (plan: StoredStudyPlan) => {
-    // Ensure planItems have isCompleted, default to false if missing from stored data
     const itemsWithCompletion = plan.planItems.map(item => ({ ...item, isCompleted: item.isCompleted || false }));
     setStudyPlanOutput({ ...plan, planItems: itemsWithCompletion });
   };
   
   const formatFirestoreTimestamp = (timestamp: Timestamp | Date | undefined): string => {
     if (!timestamp) return 'N/A';
-    if (timestamp instanceof Timestamp) {
-      return timestamp.toDate().toLocaleDateString();
-    }
-    if (timestamp instanceof Date) {
-      return timestamp.toLocaleDateString();
-    }
-    // Fallback for other potential representations if necessary, though Firestore usually gives Timestamps
-    try {
-      return new Date(timestamp as any).toLocaleDateString();
-    } catch {
-      return 'Invalid Date';
-    }
+    if (timestamp instanceof Timestamp) return timestamp.toDate().toLocaleDateString();
+    if (timestamp instanceof Date) return timestamp.toLocaleDateString();
+    try { return new Date(timestamp as any).toLocaleDateString(); } catch { return 'Invalid Date'; }
   };
-
 
   return (
     <div className="space-y-8">
@@ -156,76 +228,88 @@ export default function StudyPlanPage() {
             <CardDescription>Fill in the details below to get started.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="learningObjectives">Learning Objectives</Label>
-                <Textarea
-                  id="learningObjectives"
-                  name="learningObjectives"
-                  value={formData.learningObjectives}
-                  onChange={handleChange}
-                  placeholder="e.g., Master calculus, learn Python for data science"
-                  required
-                  className="min-h-[100px]"
-                />
+            {isLoadingProfile && <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /> <span className="ml-2">Loading profile...</span></div>}
+            {!isLoadingProfile && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="department">Department</Label>
+                <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={!user}>
+                  <SelectTrigger id="department"><SelectValue placeholder="Select Department" /></SelectTrigger>
+                  <SelectContent>{departmentOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
+              <div>
+                <Label htmlFor="semester">Semester</Label>
+                <Select value={selectedSemester} onValueChange={setSelectedSemester} disabled={!user || !selectedDepartment || availableSemesters.length === 0}>
+                  <SelectTrigger id="semester"><SelectValue placeholder="Select Semester" /></SelectTrigger>
+                  <SelectContent>{availableSemesters.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="subject">Subject (Optional)</Label>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={!user || !selectedSemester || availableSubjects.length === 0}>
+                  <SelectTrigger id="subject"><SelectValue placeholder="Select Subject" /></SelectTrigger>
+                  <SelectContent>{availableSubjects.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              
+              {selectedSubject && availableTopics.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Specific Topics for {availableSubjects.find(s=>s.value === selectedSubject)?.label}</Label>
+                  <div className="max-h-40 overflow-y-auto space-y-1 rounded-md border p-2 bg-muted/30">
+                    {availableTopics.map(topic => (
+                      <div key={topic.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`topic-${topic.value}`}
+                          checked={selectedTopics.includes(topic.value)}
+                          onCheckedChange={() => handleTopicChange(topic.value)}
+                        />
+                        <Label htmlFor={`topic-${topic.value}`} className="font-normal cursor-pointer">{topic.label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="customLearningObjectives">Other Learning Objectives (Optional)</Label>
+                <Textarea id="customLearningObjectives" value={customLearningObjectives} onChange={(e) => setCustomLearningObjectives(e.target.value)} placeholder="e.g., Prepare for a specific certification, improve problem-solving skills" className="min-h-[80px]" />
+              </div>
+              <div>
                 <Label htmlFor="availableTime">Available Time</Label>
-                <Input
-                  id="availableTime"
-                  name="availableTime"
-                  value={formData.availableTime}
-                  onChange={handleChange}
-                  placeholder="e.g., 2 hours daily, 10 hours/week for 3 months"
-                  required
-                />
+                <Input id="availableTime" value={availableTime} onChange={(e) => setAvailableTime(e.target.value)} placeholder="e.g., 2 hours daily, 10 hours/week for 3 months" required />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="resources">Overall Available Resources (Optional)</Label>
-                <Textarea
-                  id="resources"
-                  name="resources"
-                  value={formData.resources}
-                  onChange={handleChange}
-                  placeholder="e.g., Textbooks, online courses, personal notes"
-                  className="min-h-[80px]"
-                />
+              <div>
+                <Label htmlFor="userResources">Overall Available Resources (Optional)</Label>
+                <Textarea id="userResources" value={userResources} onChange={(e) => setUserResources(e.target.value)} placeholder="e.g., Textbooks, online courses, personal notes" className="min-h-[80px]" />
               </div>
               <Button type="submit" disabled={isLoading || !user} className="w-full">
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
                 {user ? 'Generate & Save Plan' : 'Login to Generate Plan'}
               </Button>
             </form>
+            )}
           </CardContent>
         </Card>
 
         {user && (
           <Card className="md:col-span-2 shadow-xl bg-card/80 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center">
-                <History className="mr-2 h-6 w-6" />
-                Study Plan History
-              </CardTitle>
+              <CardTitle className="font-headline text-2xl flex items-center"><History className="mr-2 h-6 w-6" />Study Plan History</CardTitle>
               <CardDescription>View your previously generated study plans.</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingHistory && <div className="flex justify-center py-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
-              {!isLoadingHistory && historicalPlans.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No past study plans found.</p>
-              )}
+              {!isLoadingHistory && historicalPlans.length === 0 && <p className="text-muted-foreground text-center py-4">No past study plans found.</p>}
               {!isLoadingHistory && historicalPlans.length > 0 && (
                 <ul className="space-y-3 max-h-96 overflow-y-auto">
                   {historicalPlans.map((plan) => (
                     <li key={plan.id} className="flex justify-between items-center p-3 border rounded-md hover:bg-muted/50 transition-colors">
                       <div>
                         <p className="font-medium">{plan.planTitle || "Untitled Plan"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Created: {formatFirestoreTimestamp(plan.createdAt)}
-                        </p>
+                        <p className="text-xs text-muted-foreground">Created: {formatFirestoreTimestamp(plan.createdAt)}</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => viewHistoricalPlan(plan)}>
-                        <Eye className="mr-2 h-4 w-4" /> View
-                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => viewHistoricalPlan(plan)}><Eye className="mr-2 h-4 w-4" /> View</Button>
                     </li>
                   ))}
                 </ul>
@@ -235,34 +319,24 @@ export default function StudyPlanPage() {
         )}
       </div>
 
-
       {isLoading && !studyPlanOutput && (
         <div className="flex justify-center items-center py-8 mt-8">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg text-muted-foreground">Generating your plan...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Generating your plan...</p>
         </div>
       )}
 
       {studyPlanOutput && studyPlanOutput.planItems && (
         <Card className="w-full mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="font-headline text-2xl text-primary flex items-center">
-              <TableIcon className="mr-2 h-6 w-6" />
-              {studyPlanOutput.planTitle || "Your Custom Study Plan"}
-            </CardTitle>
-             <CardDescription>
-              Currently viewing: {('id' in studyPlanOutput && studyPlanOutput.id) ? `Historical plan from ${formatFirestoreTimestamp(studyPlanOutput.createdAt)}` : 'Newly Generated Plan'}
-            </CardDescription>
+            <CardTitle className="font-headline text-2xl text-primary flex items-center"><TableIcon className="mr-2 h-6 w-6" />{studyPlanOutput.planTitle || "Your Custom Study Plan"}</CardTitle>
+            <CardDescription>Currently viewing: {('id' in studyPlanOutput && studyPlanOutput.id) ? `Historical plan from ${formatFirestoreTimestamp(studyPlanOutput.createdAt)}` : 'Newly Generated Plan'}</CardDescription>
           </CardHeader>
           <CardContent>
             <Alert className="mb-6 bg-primary/10 border-primary/30">
-              <Lightbulb className="h-5 w-5 text-primary" />
+              <ListChecks className="h-5 w-5 text-primary" />
               <AlertTitle className="font-headline text-primary">Study Plan Details</AlertTitle>
-              <AlertDescription className="text-primary/80">
-                Mark tasks as complete to track your progress! (Completion status is local for now)
-              </AlertDescription>
+              <AlertDescription className="text-primary/80">Mark tasks as complete to track your progress! (Completion status is local for now)</AlertDescription>
             </Alert>
-
             <div className="overflow-x-auto rounded-md border">
               <Table>
                 <TableHeader>
@@ -280,14 +354,9 @@ export default function StudyPlanPage() {
                 </TableHeader>
                 <TableBody>
                   {studyPlanOutput.planItems.map((item: StudyPlanItem, index: number) => (
-                    <TableRow key={index} className={cn(item.isCompleted && "bg-muted/40")}>
+                    <TableRow key={index} className={cn(item.isCompleted && "bg-green-500/10 dark:bg-green-700/20")}>
                       <TableCell className="align-top">
-                        <Checkbox
-                          checked={!!item.isCompleted}
-                          onCheckedChange={() => toggleTaskCompletion(index)}
-                          aria-label={item.isCompleted ? "Mark task as not complete" : "Mark task as complete"}
-                          className="data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                        />
+                        <Checkbox checked={!!item.isCompleted} onCheckedChange={() => toggleTaskCompletion(index)} aria-label={item.isCompleted ? "Mark task as not complete" : "Mark task as complete"} />
                       </TableCell>
                       <TableCell className={cn("font-medium align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.day}</TableCell>
                       <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.timeSlot}</TableCell>
@@ -295,11 +364,7 @@ export default function StudyPlanPage() {
                       <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.topic || '-'}</TableCell>
                       <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>{item.duration || '-'}</TableCell>
                       <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>
-                        {item.resources && item.resources.length > 0 ? (
-                          <ul className="list-disc list-inside space-y-1">
-                            {item.resources.map((res, i) => <li key={i}>{res}</li>)}
-                          </ul>
-                        ) : '-'}
+                        {item.resources && item.resources.length > 0 ? (<ul className="list-disc list-inside space-y-1">{item.resources.map((res, i) => <li key={i}>{res}</li>)}</ul>) : '-'}
                       </TableCell>
                       <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.explanation || '-'}</TableCell>
                       <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.notes || '-'}</TableCell>
@@ -308,9 +373,7 @@ export default function StudyPlanPage() {
                 </TableBody>
               </Table>
             </div>
-            {studyPlanOutput.planItems.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">No items found in this study plan.</p>
-            )}
+            {studyPlanOutput.planItems.length === 0 && <p className="text-center text-muted-foreground py-4">No items found in this study plan.</p>}
           </CardContent>
         </Card>
       )}

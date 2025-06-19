@@ -2,21 +2,49 @@
 'use server';
 
 import { db } from './firebase';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
-import type { User } from 'firebase/auth';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, Timestamp, doc, setDoc, getDoc } from 'firebase/firestore';
+import type { GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput, StudyPlanItem } from '@/ai/flows/generate-study-plan';
+
+// User Profile
+export interface UserProfile {
+  department: string;
+  semester: string; // Store semester as string to align with form values
+  email?: string; // Optional: store email if needed
+}
+
+export async function saveUserProfile(userId: string, profileData: UserProfile): Promise<void> {
+  if (!userId) throw new Error("User ID is required to save user profile.");
+  const userProfileRef = doc(db, 'users', userId); // Document ID will be the userId
+  await setDoc(userProfileRef, { ...profileData, createdAt: serverTimestamp() }, { merge: true });
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  if (!userId) return null;
+  const userProfileRef = doc(db, 'users', userId);
+  const docSnap = await getDoc(userProfileRef);
+  if (docSnap.exists()) {
+    return docSnap.data() as UserProfile;
+  }
+  return null;
+}
+
 
 // For Study Plans
 export interface StoredStudyPlan extends OriginalGenerateStudyPlanOutput {
   id: string; // Firestore document ID
   userId: string;
   createdAt: Timestamp;
+  planItems: StudyPlanItem[]; // Ensure planItems is part of the stored type
 }
 
 export async function saveStudyPlan(userId: string, planData: OriginalGenerateStudyPlanOutput): Promise<string> {
   if (!userId) throw new Error("User ID is required to save study plan.");
+  // Ensure plan items have isCompleted, default to false if missing
+  const itemsWithCompletion = planData.planItems.map(item => ({ ...item, isCompleted: item.isCompleted || false }));
+
   const docRef = await addDoc(collection(db, 'users', userId, 'studyPlans'), {
     ...planData,
+    planItems: itemsWithCompletion,
     userId,
     createdAt: serverTimestamp(),
   });
@@ -29,44 +57,16 @@ export async function getStudyPlans(userId: string): Promise<StoredStudyPlan[]> 
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => {
     const data = doc.data();
+    // Ensure planItems always exist and have isCompleted property
+    const planItems = (data.planItems || []).map((item: StudyPlanItem) => ({
+      ...item,
+      isCompleted: item.isCompleted || false,
+    }));
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt as Timestamp, // Ensure createdAt is typed as Timestamp
+      planItems,
+      createdAt: data.createdAt as Timestamp, 
     } as StoredStudyPlan;
-  });
-}
-
-// For Voice Assistant
-export interface ChatMessage {
-  id?: string; // Firestore document ID
-  userId: string;
-  userInput: string;
-  assistantResponse: string;
-  timestamp: Timestamp;
-}
-
-export async function saveChatMessage(userId: string, userInput: string, assistantResponse: string): Promise<string> {
-  if (!userId) throw new Error("User ID is required to save chat message.");
-  const docRef = await addDoc(collection(db, 'users', userId, 'voiceMessages'), {
-    userId,
-    userInput,
-    assistantResponse,
-    timestamp: serverTimestamp(),
-  });
-  return docRef.id;
-}
-
-export async function getChatHistory(userId: string): Promise<ChatMessage[]> {
-  if (!userId) return [];
-  const q = query(collection(db, 'users', userId, 'voiceMessages'), orderBy('timestamp', 'asc'));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      timestamp: data.timestamp as Timestamp, // Ensure timestamp is typed as Timestamp
-    } as ChatMessage;
   });
 }

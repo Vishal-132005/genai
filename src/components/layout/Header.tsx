@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import NavItem from './NavItem';
-import { BookText, LogOut, UserCircle, Mic } from 'lucide-react';
+import { BookText, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -51,7 +51,6 @@ export default function Header() {
             <li><NavItem href="/quiz">Quizzes</NavItem></li>
             <li><NavItem href="/summarize">Summarize</NavItem></li>
             <li><NavItem href="/generate-notes">Generate Notes</NavItem></li>
-            <li><NavItem href="/voice-assistant">Voice Assistant</NavItem></li>
           </ul>
           <div className="ml-auto flex items-center space-x-4">
             {!loading && (
