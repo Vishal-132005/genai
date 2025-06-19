@@ -258,9 +258,9 @@ const cseSemesters: DepartmentSemester[] = [
       {
         id: 'cse-s5-pe1', name: 'Professional Elective I',
         topics: [
-          { id: 'cse-s5-pe1-t1', name: 'Elective Topic 1A (e.g. Data Mining)' },
-          { id: 'cse-s5-pe1-t2', name: 'Elective Topic 1B (e.g. Advanced Java)' },
-          { id: 'cse-s5-pe1-t3', name: 'Elective Topic 1C (e.g. Soft Computing)' },
+          { id: 'cse-s5-pe1-t1', name: 'Data Mining' },
+          { id: 'cse-s5-pe1-t2', name: 'Advanced Java Programming' },
+          { id: 'cse-s5-pe1-t3', name: 'Soft Computing' },
         ],
       },
     ],
@@ -295,16 +295,16 @@ const cseSemesters: DepartmentSemester[] = [
       {
         id: 'cse-s6-pe2', name: 'Professional Elective II',
         topics: [
-          { id: 'cse-s6-pe2-t1', name: 'Elective Topic 2A (e.g. Cloud Computing)' },
-          { id: 'cse-s6-pe2-t2', name: 'Elective Topic 2B (e.g. Big Data Analytics)' },
-          { id: 'cse-s6-pe2-t3', name: 'Elective Topic 2C (e.g. IoT)' },
+          { id: 'cse-s6-pe2-t1', name: 'Cloud Computing' },
+          { id: 'cse-s6-pe2-t2', name: 'Big Data Analytics' },
+          { id: 'cse-s6-pe2-t3', name: 'Internet of Things (IoT)' },
         ],
       },
       {
         id: 'cse-s6-oe1', name: 'Open Elective I',
         topics: [
-          { id: 'cse-s6-oe1-t1', name: 'Open Elective Topic 1A' },
-          { id: 'cse-s6-oe1-t2', name: 'Open Elective Topic 1B' },
+          { id: 'cse-s6-oe1-t1', name: 'Principles of Management' },
+          { id: 'cse-s6-oe1-t2', name: 'Entrepreneurship Development' },
         ],
       },
     ],
@@ -323,23 +323,23 @@ const cseSemesters: DepartmentSemester[] = [
       {
         id: 'cse-s7-pe3', name: 'Professional Elective III',
         topics: [
-          { id: 'cse-s7-pe3-t1', name: 'Elective Topic 3A (e.g. Natural Language Processing)' },
-          { id: 'cse-s7-pe3-t2', name: 'Elective Topic 3B (e.g. Computer Vision)' },
-          { id: 'cse-s7-pe3-t3', name: 'Elective Topic 3C (e.g. Blockchain Technologies)' },
+          { id: 'cse-s7-pe3-t1', name: 'Natural Language Processing' },
+          { id: 'cse-s7-pe3-t2', name: 'Computer Vision' },
+          { id: 'cse-s7-pe3-t3', name: 'Blockchain Technologies' },
         ],
       },
       {
         id: 'cse-s7-pe4', name: 'Professional Elective IV',
         topics: [
-          { id: 'cse-s7-pe4-t1', name: 'Elective Topic 4A' },
-          { id: 'cse-s7-pe4-t2', name: 'Elective Topic 4B' },
+          { id: 'cse-s7-pe4-t1', name: 'Cyber Security' },
+          { id: 'cse-s7-pe4-t2', name: 'Mobile Application Development' },
         ],
       },
       {
         id: 'cse-s7-oe2', name: 'Open Elective II',
         topics: [
-          { id: 'cse-s7-oe2-t1', name: 'Open Elective Topic 2A' },
-          { id: 'cse-s7-oe2-t2', name: 'Open Elective Topic 2B' },
+          { id: 'cse-s7-oe2-t1', name: 'Remote Sensing and GIS' },
+          { id: 'cse-s7-oe2-t2', name: 'Disaster Management' },
         ],
       },
       {
@@ -347,7 +347,7 @@ const cseSemesters: DepartmentSemester[] = [
         topics: [
           { id: 'cse-s7-proj1-t1', name: 'Literature Survey' },
           { id: 'cse-s7-proj1-t2', name: 'Problem Formulation' },
-          { id: 'cse-s7-proj1-t3', name: 'Initial Design' },
+          { id: 'cse-s7-proj1-t3', name: 'Initial Design & Methodology' },
         ],
       },
     ],
@@ -358,23 +358,23 @@ const cseSemesters: DepartmentSemester[] = [
       {
         id: 'cse-s8-pe5', name: 'Professional Elective V',
         topics: [
-          { id: 'cse-s8-pe5-t1', name: 'Elective Topic 5A' },
-          { id: 'cse-s8-pe5-t2', name: 'Elective Topic 5B' },
+          { id: 'cse-s8-pe5-t1', name: 'Deep Learning' },
+          { id: 'cse-s8-pe5-t2', name: 'Software Project Management' },
         ],
       },
       {
         id: 'cse-s8-pe6', name: 'Professional Elective VI',
         topics: [
-          { id: 'cse-s8-pe6-t1', name: 'Elective Topic 6A' },
-          { id: 'cse-s8-pe6-t2', name: 'Elective Topic 6B' },
+          { id: 'cse-s8-pe6-t1', name: 'Quantum Computing' },
+          { id: 'cse-s8-pe6-t2', name: 'Robotics Process Automation' },
         ],
       },
       {
         id: 'cse-s8-proj2', name: 'Project Work Phase II & Internship',
         topics: [
-          { id: 'cse-s8-proj2-t1', name: 'Implementation' },
+          { id: 'cse-s8-proj2-t1', name: 'Implementation & Development' },
           { id: 'cse-s8-proj2-t2', name: 'Testing and Validation' },
-          { id: 'cse-s8-proj2-t3', name: 'Report Writing and Presentation' },
+          { id: 'cse-s8-proj2-t3', name: 'Report Writing and Final Presentation' },
         ],
       },
     ],
@@ -430,7 +430,7 @@ export const DEPARTMENTS: Department[] = departmentsList.map(dept => {
     };
   }
   // For other departments, use placeholder data
-  // You can replace this with detailed data for other departments as needed
+  // This section can be expanded with detailed curricula for each department later.
   return {
     id: dept.id,
     name: dept.name,
@@ -458,3 +458,5 @@ export const getTopicsForSubject = (deptId: string, semester: number | string, s
   const subject = subjects.find(s => s.value === subjectId);
   return subject ? subject.topics.map(t => ({ value: t.id, label: t.name })) : [];
 };
+
+    
