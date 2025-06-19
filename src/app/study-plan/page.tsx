@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateStudyPlan, type GenerateStudyPlanInput, type StudyPlanItem as OriginalStudyPlanItem, type GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb, TableIcon, History, Eye, BookOpen, ListChecks } from 'lucide-react';
+import { Loader2, Lightbulb, TableIcon, History, Eye, BookOpen, ListChecks, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -29,12 +30,13 @@ interface GenerateStudyPlanOutput extends OriginalGenerateStudyPlanOutput {
 
 export default function StudyPlanPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]); // Store topic IDs
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]); 
 
   const [availableSemesters, setAvailableSemesters] = useState<{value: string, label: string}[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<{value: string, label: string, topics: AcademicTopic[]}[]>([]);
@@ -176,13 +178,13 @@ export default function StudyPlanPage() {
       const resultFromAI: OriginalGenerateStudyPlanOutput = await generateStudyPlan(input);
       
       const itemsWithCompletionStatus = resultFromAI.planItems.map(item => ({ ...item, isCompleted: false }));
-      const newPlanToSaveAndDisplay: GenerateStudyPlanOutput = { 
+      const newPlanToSaveAndDisplay: GenerateStudyPlanOutput & { userId?: string, createdAt?: string } = { 
         planTitle: resultFromAI.planTitle, 
         planItems: itemsWithCompletionStatus 
       };
       
       await saveStudyPlan(user.uid, newPlanToSaveAndDisplay);
-      setStudyPlanOutput(newPlanToSaveAndDisplay); // Display the newly generated plan immediately
+      setStudyPlanOutput(newPlanToSaveAndDisplay); 
       toast({ title: 'Plan Saved', description: 'Your new study plan has been generated and saved.' });
       fetchHistoricalPlans(); 
     } catch (error) {
@@ -200,8 +202,6 @@ export default function StudyPlanPage() {
       i === index ? { ...item, isCompleted: !item.isCompleted } : item
     );
     setStudyPlanOutput({ ...studyPlanOutput, planItems: updatedPlanItems });
-    // Note: To persist completion status for saved plans, an updateStudyPlan Firestore function would be needed
-    // and called here if studyPlanOutput is a StoredStudyPlan.
   };
 
   const viewHistoricalPlan = (plan: StoredStudyPlan) => {
@@ -345,7 +345,7 @@ export default function StudyPlanPage() {
             <Alert className="mb-6 bg-primary/10 border-primary/30">
               <ListChecks className="h-5 w-5 text-primary" />
               <AlertTitle className="font-headline text-primary">Study Plan Details</AlertTitle>
-              <AlertDescription className="text-primary/80">Mark tasks as complete to track your progress! (Completion status is local for now)</AlertDescription>
+              <AlertDescription className="text-primary/80">Mark tasks as complete to track your progress. Click on an explanation to generate a quiz!</AlertDescription>
             </Alert>
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -358,7 +358,7 @@ export default function StudyPlanPage() {
                     <TableHead className="min-w-[150px]">Topic</TableHead>
                     <TableHead className="min-w-[80px]">Duration</TableHead>
                     <TableHead className="min-w-[200px]">Resources</TableHead>
-                    <TableHead className="min-w-[250px]">Explanation/Focus</TableHead>
+                    <TableHead className="min-w-[250px]">Explanation/Focus & Quiz</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -376,7 +376,22 @@ export default function StudyPlanPage() {
                       <TableCell className={cn("align-top", item.isCompleted && "line-through text-muted-foreground")}>
                         {item.resources && item.resources.length > 0 ? (<ul className="list-disc list-inside space-y-1">{item.resources.map((res, i) => <li key={i}>{res}</li>)}</ul>) : '-'}
                       </TableCell>
-                      <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.explanation || '-'}</TableCell>
+                      <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>
+                        <p className="mb-2">{item.explanation || '-'}</p>
+                        {(item.topic || item.activity) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-primary text-primary hover:bg-primary/10"
+                            onClick={() => {
+                              const quizTopic = item.topic || item.activity;
+                              router.push(`/quiz?topic=${encodeURIComponent(quizTopic)}&numQuestions=30&sourceActivity=${encodeURIComponent(item.activity)}`);
+                            }}
+                          >
+                            <Zap className="mr-2 h-4 w-4" /> Generate Quiz
+                          </Button>
+                        )}
+                      </TableCell>
                       <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.notes || '-'}</TableCell>
                     </TableRow>
                   ))}
