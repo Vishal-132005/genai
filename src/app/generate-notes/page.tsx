@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { generateNotes, type GenerateNotesInput, type GenerateNotesOutput } from '@/ai/flows/generate-notes-flow';
 import { chatWithNotes, type ChatWithNotesInput, type ChatWithNotesOutput } from '@/ai/flows/chatWithNotesFlow';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, NotebookText, Sparkles, Download, MessageCircle, Send, History, Eye } from 'lucide-react';
+import { Loader2, NotebookText, Sparkles, Download, MessageCircle, Send, History, Eye, MessageSquarePlus, Quote } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -45,6 +45,8 @@ export default function GenerateNotesPage() {
   const [historicalNotes, setHistoricalNotes] = useState<StoredGeneratedNote[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [currentViewedNoteId, setCurrentViewedNoteId] = useState<string | null>(null);
+
+  const [selectedTextFromNote, setSelectedTextFromNote] = useState<string | null>(null);
 
 
   const fetchHistoricalNotes = useCallback(async () => {
@@ -95,8 +97,9 @@ export default function GenerateNotesPage() {
     }
     setIsLoading(true);
     setGeneratedNotes(null);
-    setChatMessages([]); // Clear chat when new notes are generated
+    setChatMessages([]); 
     setCurrentViewedNoteId(null); 
+    setSelectedTextFromNote(null);
     try {
       const input: GenerateNotesInput = { topicOrPlanDetails };
       const result: GenerateNotesOutput = await generateNotes(input);
@@ -105,7 +108,7 @@ export default function GenerateNotesPage() {
         try {
           await saveGeneratedNote(user.uid, { topicOrPlanDetails, generatedNotes: result.generatedNotes });
           toast({ title: "Notes Saved", description: "Your generated notes have been saved to history."});
-          fetchHistoricalNotes(); // Refresh history
+          fetchHistoricalNotes(); 
         } catch (saveError) {
            console.error('Error saving notes:', saveError);
            toast({ title: 'Save Error', description: 'Could not save notes to history.', variant: 'destructive' });
@@ -175,6 +178,7 @@ export default function GenerateNotesPage() {
     setChatMessages(prev => [...prev, newUserMessage]);
     setCurrentChatMessage('');
     setIsChatting(true);
+    setSelectedTextFromNote(null); // Clear selection after sending message
 
     try {
       const input: ChatWithNotesInput = { notesContent: generatedNotes, userQuestion: newUserMessage.content };
@@ -194,8 +198,9 @@ export default function GenerateNotesPage() {
   const handleViewHistoricalNote = (note: StoredGeneratedNote) => {
     setTopicOrPlanDetails(note.topicOrPlanDetails);
     setGeneratedNotes(note.generatedNotes);
-    setChatMessages([]); // Clear chat when loading historical notes
+    setChatMessages([]); 
     setCurrentViewedNoteId(note.id);
+    setSelectedTextFromNote(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -212,13 +217,36 @@ export default function GenerateNotesPage() {
     }
   };
 
+  const handleNoteTextSelection = () => {
+    if (notesContentRef.current) {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+      if (selectedText && selectedText.length > 0) {
+        setSelectedTextFromNote(selectedText);
+      } else {
+        setSelectedTextFromNote(null);
+      }
+    }
+  };
+
+  const handleUseSelectionInChat = () => {
+    if (selectedTextFromNote) {
+      setCurrentChatMessage(prevMessage => 
+        `Regarding the selection: "${selectedTextFromNote}"\n\n${prevMessage}`.trim()
+      );
+      // Programmatically focus the input field
+      const chatInput = document.getElementById('chat-input');
+      if(chatInput) chatInput.focus();
+      setSelectedTextFromNote(null); // Hide the button after use
+    }
+  };
 
   return (
     <div className="space-y-8">
       <header className="text-center">
         <h1 className="text-4xl font-bold font-headline text-primary">AI Note Generator</h1>
         <p className="text-lg text-muted-foreground mt-2">
-          Provide topics or plan details, get notes, and chat with AI about them.
+          Provide topics, get notes, chat about selections, and review your note history.
         </p>
       </header>
 
@@ -306,11 +334,15 @@ export default function GenerateNotesPage() {
                 <NotebookText className="h-5 w-5 text-primary" />
                 <AlertTitle className="font-headline text-primary">Notes Ready!</AlertTitle>
                 <AlertDescription className="text-primary/80">
-                  Here are your study notes. You can download them or chat about them.
+                  Select text in the notes below and click "Use Selection" to focus your chat questions.
                 </AlertDescription>
               </Alert>
               <ScrollArea className="h-[500px] pr-4">
-                <div ref={notesContentRef} className="prose dark:prose-invert max-w-none p-4 bg-muted/50 rounded-md border">
+                <div 
+                  ref={notesContentRef} 
+                  className="prose dark:prose-invert max-w-none p-4 bg-muted/50 rounded-md border select-text"
+                  onMouseUp={handleNoteTextSelection}
+                >
                   <ReactMarkdown>{generatedNotes}</ReactMarkdown>
                 </div>
               </ScrollArea>
@@ -326,24 +358,26 @@ export default function GenerateNotesPage() {
           <Card className="shadow-xl bg-card/80 backdrop-blur-sm md:col-span-1 flex flex-col">
             <CardHeader>
               <CardTitle className="font-headline text-2xl text-accent flex items-center">
-                <MessageCircle className="mr-2 h-6 w-6" /> Chat with Your Notes
+                <MessageSquarePlus className="mr-2 h-6 w-6" /> Chat with Your Notes
               </CardTitle>
-              <CardDescription>Ask questions based on the currently displayed notes.</CardDescription>
+              <CardDescription>Ask questions. Select text from notes and click "Use Selection" to add context.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col space-y-4 overflow-hidden">
               <ScrollArea className="flex-grow h-0 min-h-[300px] border rounded-md p-4 bg-muted/30" ref={chatScrollAreaRef}>
-                {chatMessages.length === 0 && <p className="text-muted-foreground text-center">No messages yet. Ask a question below!</p>}
+                {chatMessages.length === 0 && <p className="text-muted-foreground text-center py-4">No messages yet. Ask a question below!</p>}
                 {chatMessages.map((msg, index) => (
                   <div
                     key={index}
                     className={cn(
-                      "mb-3 p-3 rounded-lg max-w-[85%] whitespace-pre-wrap break-words",
-                      msg.role === 'user' ? 'bg-primary/20 text-primary-foreground ml-auto rounded-br-none' : 'bg-accent/10 text-accent-foreground mr-auto rounded-bl-none'
+                      "mb-3 p-3 rounded-lg max-w-[85%] break-words",
+                      msg.role === 'user' 
+                        ? 'bg-primary/90 text-primary-foreground ml-auto rounded-br-none shadow-md' 
+                        : 'bg-accent/80 text-accent-foreground mr-auto rounded-bl-none shadow-md'
                     )}
                   >
                     <ReactMarkdown
                       components={{ 
-                        p: ({node, ...props}) => <p className="mb-0" {...props} />
+                        p: ({node, ...props}) => <p className="mb-0 text-sm" {...props} />
                       }}
                     >
                       {msg.content}
@@ -358,17 +392,32 @@ export default function GenerateNotesPage() {
                 )}
               </ScrollArea>
             </CardContent>
-            <CardFooter className="p-4 border-t">
+            <CardFooter className="p-4 border-t flex flex-col items-start gap-2">
+              {selectedTextFromNote && (
+                <div className="w-full flex items-center gap-2 mb-2 p-2 border rounded-md bg-primary/10">
+                    <Quote className="h-5 w-5 text-primary shrink-0" />
+                    <p className="text-sm text-primary/90 truncate flex-grow italic">Selected: "{selectedTextFromNote}"</p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUseSelectionInChat}
+                        className="shrink-0"
+                    >
+                        <MessageCircle className="mr-2 h-4 w-4" /> Use Selection
+                    </Button>
+                </div>
+              )}
               <form onSubmit={handleChatSubmit} className="w-full flex gap-2 items-center">
                 <Input
+                  id="chat-input"
                   type="text"
-                  placeholder="Ask a question about the notes..."
+                  placeholder="Ask about the notes..."
                   value={currentChatMessage}
                   onChange={(e) => setCurrentChatMessage(e.target.value)}
                   disabled={isChatting || !user}
                   className="flex-grow"
                 />
-                <Button type="submit" disabled={isChatting || !currentChatMessage.trim() || !user} size="icon">
+                <Button type="submit" disabled={isChatting || !currentChatMessage.trim() || !user} size="icon" className="bg-accent hover:bg-accent/90">
                   {isChatting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   <span className="sr-only">Send</span>
                 </Button>
@@ -380,3 +429,4 @@ export default function GenerateNotesPage() {
     </div>
   );
 }
+
