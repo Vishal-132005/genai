@@ -15,7 +15,7 @@ export interface UserProfile {
 export async function saveUserProfile(userId: string, profileData: UserProfile): Promise<void> {
   if (!userId) throw new Error("User ID is required to save user profile.");
   const userProfileRef = doc(db, 'users', userId); // Document ID will be the userId
-  await setDoc(userProfileRef, { ...profileData, createdAt: serverTimestamp() }, { merge: true });
+  await setDoc(userProfileRef, { ...profileData, createdAt: serverTimestamp(), lastUpdatedAt: serverTimestamp() }, { merge: true });
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -33,7 +33,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 export interface StoredStudyPlan extends OriginalGenerateStudyPlanOutput {
   id: string; // Firestore document ID
   userId: string;
-  createdAt: Timestamp;
+  createdAt: string; // Changed from Timestamp to string (ISO string)
   planItems: StudyPlanItem[]; // Ensure planItems is part of the stored type
 }
 
@@ -62,11 +62,15 @@ export async function getStudyPlans(userId: string): Promise<StoredStudyPlan[]> 
       ...item,
       isCompleted: item.isCompleted || false,
     }));
+    const firestoreTimestamp = data.createdAt as Timestamp;
     return {
       id: doc.id,
-      ...data,
+      userId: data.userId,
+      planTitle: data.planTitle,
       planItems,
-      createdAt: data.createdAt as Timestamp, 
+      // Convert Timestamp to ISO string
+      createdAt: firestoreTimestamp ? firestoreTimestamp.toDate().toISOString() : new Date().toISOString(),
     } as StoredStudyPlan;
   });
 }
+

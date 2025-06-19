@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveStudyPlan, getStudyPlans, type StoredStudyPlan, getUserProfile, type UserProfile } from '@/lib/firestoreService';
-import { Timestamp } from 'firebase/firestore';
+// Removed Timestamp import as it's handled as string from service
 import { getDepartments, getSemestersForDepartment, getSubjectsForSemester, getTopicsForSubject, type Topic as AcademicTopic } from '@/lib/academicData';
 
 interface StudyPlanItem extends OriginalStudyPlanItem {
@@ -178,7 +178,6 @@ export default function StudyPlanPage() {
       const result: OriginalGenerateStudyPlanOutput = await generateStudyPlan(input);
       const itemsWithCompletion = result.planItems.map(item => ({ ...item, isCompleted: false }));
       const fullResult = { ...result, planItems: itemsWithCompletion };
-      setStudyPlanOutput(fullResult);
       await saveStudyPlan(user.uid, fullResult);
       toast({ title: 'Plan Saved', description: 'Your new study plan has been saved.' });
       fetchHistoricalPlans(); 
@@ -205,11 +204,18 @@ export default function StudyPlanPage() {
     setStudyPlanOutput({ ...plan, planItems: itemsWithCompletion });
   };
   
-  const formatFirestoreTimestamp = (timestamp: Timestamp | Date | undefined): string => {
-    if (!timestamp) return 'N/A';
-    if (timestamp instanceof Timestamp) return timestamp.toDate().toLocaleDateString();
-    if (timestamp instanceof Date) return timestamp.toLocaleDateString();
-    try { return new Date(timestamp as any).toLocaleDateString(); } catch { return 'Invalid Date'; }
+  const formatFirestoreTimestamp = (timestampInput: string | Date | undefined): string => {
+    if (!timestampInput) return 'N/A';
+    try {
+      const dateObj = new Date(timestampInput);
+      // Check if the date is valid after parsing
+      if (isNaN(dateObj.getTime())) {
+        return 'Invalid Date';
+      }
+      return dateObj.toLocaleDateString();
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
   return (
@@ -329,7 +335,7 @@ export default function StudyPlanPage() {
         <Card className="w-full mx-auto shadow-xl mt-8 bg-card/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="font-headline text-2xl text-primary flex items-center"><TableIcon className="mr-2 h-6 w-6" />{studyPlanOutput.planTitle || "Your Custom Study Plan"}</CardTitle>
-            <CardDescription>Currently viewing: {('id' in studyPlanOutput && studyPlanOutput.id) ? `Historical plan from ${formatFirestoreTimestamp(studyPlanOutput.createdAt)}` : 'Newly Generated Plan'}</CardDescription>
+            <CardDescription>Currently viewing: {('id' in studyPlanOutput && studyPlanOutput.id && studyPlanOutput.createdAt) ? `Historical plan from ${formatFirestoreTimestamp(studyPlanOutput.createdAt)}` : 'Newly Generated Plan'}</CardDescription>
           </CardHeader>
           <CardContent>
             <Alert className="mb-6 bg-primary/10 border-primary/30">
@@ -380,3 +386,4 @@ export default function StudyPlanPage() {
     </div>
   );
 }
+
