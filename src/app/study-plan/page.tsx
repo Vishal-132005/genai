@@ -17,7 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveStudyPlan, getStudyPlans, type StoredStudyPlan, getUserProfile, type UserProfile } from '@/lib/firestoreService';
-// Removed Timestamp import as it's handled as string from service
 import { getDepartments, getSemestersForDepartment, getSubjectsForSemester, getTopicsForSubject, type Topic as AcademicTopic } from '@/lib/academicData';
 
 interface StudyPlanItem extends OriginalStudyPlanItem {
@@ -86,7 +85,7 @@ export default function StudyPlanPage() {
   useEffect(() => {
     if (selectedDepartment) {
       setAvailableSemesters(getSemestersForDepartment(selectedDepartment));
-      if (userProfile?.department !== selectedDepartment) setSelectedSemester(''); // Reset semester if dept changes from profile
+      if (userProfile?.department !== selectedDepartment) setSelectedSemester(''); 
     } else {
       setAvailableSemesters([]);
     }
@@ -166,20 +165,25 @@ export default function StudyPlanPage() {
        return;
     }
 
-
     setIsLoading(true);
-    setStudyPlanOutput(null);
+    setStudyPlanOutput(null); 
     try {
       const input: GenerateStudyPlanInput = {
         learningObjectives,
         availableTime,
         resources: userResources,
       };
-      const result: OriginalGenerateStudyPlanOutput = await generateStudyPlan(input);
-      const itemsWithCompletion = result.planItems.map(item => ({ ...item, isCompleted: false }));
-      const fullResult = { ...result, planItems: itemsWithCompletion };
-      await saveStudyPlan(user.uid, fullResult);
-      toast({ title: 'Plan Saved', description: 'Your new study plan has been saved.' });
+      const resultFromAI: OriginalGenerateStudyPlanOutput = await generateStudyPlan(input);
+      
+      const itemsWithCompletionStatus = resultFromAI.planItems.map(item => ({ ...item, isCompleted: false }));
+      const newPlanToSaveAndDisplay: GenerateStudyPlanOutput = { 
+        planTitle: resultFromAI.planTitle, 
+        planItems: itemsWithCompletionStatus 
+      };
+      
+      await saveStudyPlan(user.uid, newPlanToSaveAndDisplay);
+      setStudyPlanOutput(newPlanToSaveAndDisplay); // Display the newly generated plan immediately
+      toast({ title: 'Plan Saved', description: 'Your new study plan has been generated and saved.' });
       fetchHistoricalPlans(); 
     } catch (error) {
       console.error('Error generating study plan:', error);
@@ -190,13 +194,14 @@ export default function StudyPlanPage() {
   };
 
   const toggleTaskCompletion = (index: number) => {
-    if (!studyPlanOutput || !('planItems' in studyPlanOutput)) return; // Type guard for StoredStudyPlan
+    if (!studyPlanOutput || !('planItems' in studyPlanOutput)) return; 
     const currentPlanItems = studyPlanOutput.planItems || [];
     const updatedPlanItems = currentPlanItems.map((item, i) =>
       i === index ? { ...item, isCompleted: !item.isCompleted } : item
     );
     setStudyPlanOutput({ ...studyPlanOutput, planItems: updatedPlanItems });
-    // Note: To persist completion status, an updateStudyPlan Firestore function would be needed.
+    // Note: To persist completion status for saved plans, an updateStudyPlan Firestore function would be needed
+    // and called here if studyPlanOutput is a StoredStudyPlan.
   };
 
   const viewHistoricalPlan = (plan: StoredStudyPlan) => {
@@ -208,7 +213,6 @@ export default function StudyPlanPage() {
     if (!timestampInput) return 'N/A';
     try {
       const dateObj = new Date(timestampInput);
-      // Check if the date is valid after parsing
       if (isNaN(dateObj.getTime())) {
         return 'Invalid Date';
       }
@@ -386,4 +390,3 @@ export default function StudyPlanPage() {
     </div>
   );
 }
-
