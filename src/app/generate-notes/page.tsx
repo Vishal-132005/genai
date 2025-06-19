@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,12 +16,22 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 export default function GenerateNotesPage() {
+  const searchParams = useSearchParams();
   const [topicOrPlanDetails, setTopicOrPlanDetails] = useState('');
   const [generatedNotes, setGeneratedNotes] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const { toast } = useToast();
   const notesContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const topicParam = searchParams.get('topicOrPlanDetails');
+    if (topicParam) {
+      setTopicOrPlanDetails(decodeURIComponent(topicParam));
+      // Optionally, you could trigger generation here or prompt the user
+      // toast({ title: "Topic Pre-filled", description: "Topic from study plan has been pre-filled." });
+    }
+  }, [searchParams, toast]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -62,28 +73,42 @@ export default function GenerateNotesPage() {
     setIsDownloadingPdf(true);
     try {
       const element = notesContentRef.current;
-      const canvas = await html2canvas(element, { scale: 2 }); // Increase scale for better quality
+      // Temporarily set body background to white for html2canvas capture if needed
+      // const originalBodyColor = document.body.style.backgroundColor;
+      // document.body.style.backgroundColor = 'white';
+
+      const canvas = await html2canvas(element, { 
+        scale: 2, 
+        backgroundColor: null, // Use element's background or default (white if none)
+        useCORS: true, // If images from other domains are present
+      });
+      
+      // document.body.style.backgroundColor = originalBodyColor; // Restore original body color
+
       const imgData = canvas.toDataURL('image/png');
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      // const pdfHeight = pdf.internal.pageSize.getHeight(); // Not directly used for scaling by height
       
       const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pdfWidth;
+      const imgWidth = pdfWidth - 20; // pdfWidth with some margin
       const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
+      let currentPdfHeight = pdf.internal.pageSize.getHeight();
       let heightLeft = imgHeight;
-      let position = 0;
+      let position = 10; // Initial top margin
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
+      // Add first page with margin
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= (currentPdfHeight - 20); // Subtract available height on page (considering margins)
 
       while (heightLeft > 0) {
-        position = heightLeft - imgHeight; // Equivalent to position -= pdfHeight;
+        position = heightLeft - imgHeight + 10; // Adjust position for subsequent pages, add top margin
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+        currentPdfHeight = pdf.internal.pageSize.getHeight(); // Update for new page, if different (unlikely for 'a4')
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight); // Add image with margin
+        heightLeft -= (currentPdfHeight - 20);
       }
       
       pdf.save('study-notes.pdf');
@@ -113,7 +138,7 @@ export default function GenerateNotesPage() {
       <Card className="max-w-2xl mx-auto shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="font-headline text-2xl">Generate Study Notes</CardTitle>
-          <CardDescription>Enter the topics or content you want notes for.</CardDescription>
+          <CardDescription>Enter the topics or content you want notes for. You can also start from a study plan item.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -171,3 +196,4 @@ export default function GenerateNotesPage() {
     </div>
   );
 }
+

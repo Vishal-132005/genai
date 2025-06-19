@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateStudyPlan, type GenerateStudyPlanInput, type StudyPlanItem as OriginalStudyPlanItem, type GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput } from '@/ai/flows/generate-study-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Lightbulb, TableIcon, History, Eye, BookOpen, ListChecks, Zap } from 'lucide-react';
+import { Loader2, Lightbulb, TableIcon, History, Eye, BookOpen, ListChecks, Zap, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -345,7 +345,7 @@ export default function StudyPlanPage() {
             <Alert className="mb-6 bg-primary/10 border-primary/30">
               <ListChecks className="h-5 w-5 text-primary" />
               <AlertTitle className="font-headline text-primary">Study Plan Details</AlertTitle>
-              <AlertDescription className="text-primary/80">Mark tasks as complete to track your progress. Click on an explanation to generate a quiz!</AlertDescription>
+              <AlertDescription className="text-primary/80">Mark tasks as complete to track your progress. Click on an explanation to generate a quiz or notes!</AlertDescription>
             </Alert>
             <div className="overflow-x-auto rounded-md border">
               <Table>
@@ -358,7 +358,7 @@ export default function StudyPlanPage() {
                     <TableHead className="min-w-[150px]">Topic</TableHead>
                     <TableHead className="min-w-[80px]">Duration</TableHead>
                     <TableHead className="min-w-[200px]">Resources</TableHead>
-                    <TableHead className="min-w-[250px]">Explanation/Focus & Quiz</TableHead>
+                    <TableHead className="min-w-[250px]">Explanation/Focus & Actions</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -378,19 +378,34 @@ export default function StudyPlanPage() {
                       </TableCell>
                       <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>
                         <p className="mb-2">{item.explanation || '-'}</p>
-                        {(item.topic || item.activity) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-primary text-primary hover:bg-primary/10"
-                            onClick={() => {
-                              const quizTopic = item.topic || item.activity;
-                              router.push(`/quiz?topic=${encodeURIComponent(quizTopic)}&numQuestions=30&sourceActivity=${encodeURIComponent(item.activity)}`);
-                            }}
-                          >
-                            <Zap className="mr-2 h-4 w-4" /> Generate Quiz
-                          </Button>
-                        )}
+                        <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                          {(item.topic || item.activity) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-primary text-primary hover:bg-primary/10 flex-1"
+                              onClick={() => {
+                                const quizTopic = item.topic || item.activity;
+                                router.push(`/quiz?topic=${encodeURIComponent(quizTopic)}&numQuestions=30&sourceActivity=${encodeURIComponent(item.activity)}`);
+                              }}
+                            >
+                              <Zap className="mr-2 h-4 w-4" /> Generate Quiz
+                            </Button>
+                          )}
+                          {(item.topic || item.activity) && (
+                             <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-accent text-accent hover:bg-accent/10 flex-1"
+                              onClick={() => {
+                                const notesTopic = item.topic || item.explanation || item.activity;
+                                router.push(`/generate-notes?topicOrPlanDetails=${encodeURIComponent(notesTopic)}`);
+                              }}
+                            >
+                              <FileText className="mr-2 h-4 w-4" /> Generate Notes
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className={cn("align-top whitespace-pre-wrap", item.isCompleted && "line-through text-muted-foreground")}>{item.notes || '-'}</TableCell>
                     </TableRow>
@@ -405,3 +420,4 @@ export default function StudyPlanPage() {
     </div>
   );
 }
+
