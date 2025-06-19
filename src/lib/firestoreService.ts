@@ -4,7 +4,8 @@
 import { db } from './firebase';
 import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, Timestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { GenerateStudyPlanOutput as OriginalGenerateStudyPlanOutput, StudyPlanItem } from '@/ai/flows/generate-study-plan';
-import type { Question as QuizQuestionType, UserAnswer as QuizUserAnswerType } from '@/app/quiz/page'; // Assuming these types are exported or defined in quiz page
+import type { Question as QuizQuestionType, UserAnswer as QuizUserAnswerType } from '@/app/quiz/page';
+import type { GenerateNotesOutput as OriginalGenerateNotesOutput } from '@/ai/flows/generate-notes-flow';
 
 // User Profile
 export interface UserProfile {
@@ -113,5 +114,43 @@ export async function getQuizAttempts(userId: string): Promise<StoredQuizAttempt
       score: data.score,
       createdAt: firestoreTimestamp ? firestoreTimestamp.toDate().toISOString() : new Date().toISOString(),
     } as StoredQuizAttempt;
+  });
+}
+
+// Generated Notes
+export interface StoredGeneratedNote extends OriginalGenerateNotesOutput {
+  id: string;
+  userId: string;
+  topicOrPlanDetails: string;
+  createdAt: string; // ISO string
+}
+
+export async function saveGeneratedNote(
+  userId: string,
+  noteData: { topicOrPlanDetails: string; generatedNotes: string }
+): Promise<string> {
+  if (!userId) throw new Error("User ID is required to save generated note.");
+  const docRef = await addDoc(collection(db, 'users', userId, 'generatedNotes'), {
+    ...noteData,
+    userId,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function getGeneratedNotesHistory(userId: string): Promise<StoredGeneratedNote[]> {
+  if (!userId) return [];
+  const q = query(collection(db, 'users', userId, 'generatedNotes'), orderBy('createdAt', 'desc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    const firestoreTimestamp = data.createdAt as Timestamp;
+    return {
+      id: doc.id,
+      userId: data.userId,
+      topicOrPlanDetails: data.topicOrPlanDetails,
+      generatedNotes: data.generatedNotes,
+      createdAt: firestoreTimestamp ? firestoreTimestamp.toDate().toISOString() : new Date().toISOString(),
+    } as StoredGeneratedNote;
   });
 }
