@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, type FormEvent, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { saveChatMessage, getChatHistory, type ChatMessage as StoredChatMessage } from '@/lib/firestoreService';
 import { Timestamp } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 declare global {
   interface Window {
@@ -105,7 +106,7 @@ export default function VoiceAssistantPage() {
         toast({
           title: 'Speech Recognition Not Supported',
           description: 'Your browser does not support speech recognition. You can still type your messages.',
-          variant: 'destructive',
+          variant: 'default', // Changed to default as it's informational
         });
         return;
       }
@@ -113,14 +114,14 @@ export default function VoiceAssistantPage() {
       if (!recognitionRef.current) {
         const recognitionInstance = new SpeechRecognitionAPI();
         recognitionInstance.continuous = false;
-        recognitionInstance.interimResults = false;
+        recognitionInstance.interimResults = false; // We only care about the final result
 
         recognitionInstance.onstart = () => setIsRecording(true);
 
         recognitionInstance.onresult = (event) => {
           const transcript = event.results[event.results.length - 1][0].transcript.trim();
           setUserInput(transcript);
-          if (transcript) {
+          if (transcript) { // Automatically submit if transcript is not empty
             void handleSubmit(undefined, transcript);
           }
         };
@@ -132,8 +133,8 @@ export default function VoiceAssistantPage() {
           let errorMsg = 'An error occurred during speech recognition.';
           if (event.error === 'no-speech') errorMsg = 'No speech was detected. Please try speaking louder or clearer.';
           else if (event.error === 'audio-capture') errorMsg = 'Microphone problem. Ensure it is connected and enabled.';
-          else if (event.error === 'not-allowed') errorMsg = 'Microphone access denied. Please enable permissions.';
-          else if (event.error === 'network') errorMsg = 'Network error during speech recognition. Check connection.';
+          else if (event.error === 'not-allowed') errorMsg = 'Microphone access denied. Please enable permissions in your browser settings.';
+          else if (event.error === 'network') errorMsg = 'Network error during speech recognition. Check your internet connection and try again.';
           else if (event.error !== 'aborted') errorMsg = `Speech recognition error: ${event.error}. Please try again.`;
           
           if (event.error !== 'aborted') { // Don't toast on manual abort
@@ -145,16 +146,23 @@ export default function VoiceAssistantPage() {
         recognitionRef.current = recognitionInstance;
       }
     }
+    // Cleanup function
     return () => {
       if (synthesisRef.current) synthesisRef.current.cancel();
-      if (recognitionRef.current) recognitionRef.current.abort();
+      if (recognitionRef.current) {
+        recognitionRef.current.abort(); // Abort any ongoing recognition
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
   const speakResponse = (text: string) => {
     if (synthesisRef.current && speechApiSupported && text) {
-      synthesisRef.current.cancel();
+      synthesisRef.current.cancel(); // Cancel any previous speech
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -176,19 +184,24 @@ export default function VoiceAssistantPage() {
       toast({ title: 'Initialization Error', description: 'Speech recognition service is not ready.', variant: 'destructive' });
       return;
     }
+
     if (isRecording) {
       recognitionRef.current.stop();
     } else {
-      setUserInput('');
-      if (synthesisRef.current) synthesisRef.current.cancel();
+      setUserInput(''); // Clear any typed input when starting voice
+      if (synthesisRef.current) synthesisRef.current.cancel(); // Stop any ongoing speech
       try {
+        // Ensure permissions are requested or handled by the browser.
+        // Starting recognition typically prompts for permission if not already granted.
         recognitionRef.current.start();
       } catch (error) {
+        // This catch block might handle synchronous errors from .start() if any.
         console.error("Error starting recognition:", error);
         let message = 'Could not start voice recording. Check permissions and ensure mic is not in use.';
          if (error instanceof DOMException) {
             if (error.name === 'NotAllowedError') message = 'Microphone access denied. Please enable permissions.';
-            else if (error.name === 'InvalidStateError') message = 'Voice recognition is already active. Please try again.';
+            // DOMException: The user agent is currently capturing audio and is not able to start a new recognition.
+            else if (error.name === 'InvalidStateError') message = 'Voice recognition is already active or not ready. Please try again.';
         }
         toast({ title: 'Mic Start Error', description: message, variant: 'destructive' });
         setIsRecording(false);
@@ -219,22 +232,38 @@ export default function VoiceAssistantPage() {
       const result: VoiceAssistantOutput = await voiceAssistant(input);
       
       speakResponse(result.assistantResponse);
+      // Save to Firestore
       await saveChatMessage(user.uid, currentInput, result.assistantResponse);
-      // Fetch history again to get the actual stored message with its ID and server timestamp
-      // Or, for optimistic update, create assistant message with temp ID and update later
-      const newAssistantMessage: DisplayMessage = { id: `temp-assistant-${Date.now()}`, type: 'assistant', text: result.assistantResponse, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-      setChatMessages(prev => [...prev.filter(m => m.id !== newUserMessage.id), // remove temp user message if we want to replace with server one
-                                  {...newUserMessage, id: `user-${Date.now()}`}, // make user id more permanent for key
-                                  newAssistantMessage]);
-      // For a more robust solution, you'd fetch history or get the saved doc ID back
-      // For now, simple optimistic update and local display. Let's fetch history to be robust.
-      fetchHistory();
+      
+      // Optimistically update the UI with the assistant's response
+      // Then fetch history to get the accurate, stored version including server timestamp
+      const newAssistantMessage: DisplayMessage = { 
+        id: `temp-assistant-${Date.now()}`, 
+        type: 'assistant', 
+        text: result.assistantResponse, 
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      };
+      setChatMessages(prev => {
+        const withoutTempUser = prev.filter(m => m.id !== newUserMessage.id);
+        return [...withoutTempUser, {...newUserMessage, id: `user-${Date.now()}`}, newAssistantMessage];
+      });
+      
+      // Re-fetch history to ensure data consistency with Firestore
+      // This will replace temp messages with server-stamped ones.
+      await fetchHistory();
 
 
     } catch (error) {
       console.error('Error with voice assistant:', error);
       toast({ title: 'Assistant Error', description: 'Failed to get a response. Please try again.', variant: 'destructive' });
-      setChatMessages(prev => [...prev, { id: `error-${Date.now()}`, type: 'assistant', text: "Sorry, I couldn't process that." }]);
+      // Remove temp user message if AI fails
+      setChatMessages(prev => prev.filter(m => m.id !== newUserMessage.id));
+      setChatMessages(prev => [...prev, { 
+        id: `error-msg-${Date.now()}`, 
+        type: 'assistant', 
+        text: "Sorry, I couldn't process that. Please try again.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -245,16 +274,16 @@ export default function VoiceAssistantPage() {
       <header className="text-center shrink-0">
         <h1 className="text-4xl font-bold font-headline text-primary">Voice Assistant</h1>
         <p className="text-lg text-muted-foreground mt-2">
-          Talk to your AI assistant. Click the mic to speak.
+          Talk to your AI assistant. Click the mic to speak or type your message.
         </p>
       </header>
 
       {!speechApiSupported && (
-         <Alert variant="destructive" className="max-w-2xl mx-auto shrink-0">
+         <Alert variant="default" className="max-w-2xl mx-auto shrink-0">
             <MicOff className="h-5 w-5" />
             <AlertTitle>Speech API Not Supported</AlertTitle>
             <AlertDescription>
-              Your browser does not support the Speech APIs. Voice interaction is disabled.
+              Your browser does not support the Speech APIs. Voice interaction is disabled. You can still type your messages.
             </AlertDescription>
         </Alert>
       )}
@@ -264,7 +293,11 @@ export default function VoiceAssistantPage() {
           <CardTitle className="font-headline text-2xl flex items-center">
             {isRecording ? <MicOff className="mr-2 h-6 w-6 text-red-500 animate-pulse" /> : <Mic className="mr-2 h-6 w-6" />}
             Chat
+            {isSpeaking && <Volume2 className="ml-2 h-5 w-5 text-accent animate-pulse" />}
           </CardTitle>
+          <CardDescription>
+            {user ? `Conversation history for ${user.email}` : 'Login to save and view chat history.'}
+          </CardDescription>
         </CardHeader>
         <CardContent ref={chatContainerRef} className="flex-grow overflow-y-auto p-4 space-y-4">
           <ScrollArea className="h-full w-full pr-4">
@@ -282,15 +315,25 @@ export default function VoiceAssistantPage() {
                 </div>
               </div>
             ))}
-             {isLoading && chatMessages.length > 0 && (
+             {isLoading && chatMessages.length > 0 && chatMessages[chatMessages.length -1].type === 'user' && ( // Show loading only after user message
               <div className="flex justify-start mb-3">
                   <div className="max-w-[70%] p-3 rounded-xl shadow bg-muted text-muted-foreground rounded-bl-none">
                       <div className="flex items-center gap-2 mb-1">
                           <Bot className="h-4 w-4" />
-                          <span className="text-xs opacity-80">Typing...</span>
+                          <span className="text-xs opacity-80">Thinking...</span>
                       </div>
                       <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
+              </div>
+            )}
+             {!user && chatMessages.length === 0 && !isLoading && (
+              <div className="text-center text-muted-foreground py-10">
+                <p>Please log in to start chatting and save your history.</p>
+              </div>
+            )}
+            {user && chatMessages.length === 0 && !isLoading && (
+              <div className="text-center text-muted-foreground py-10">
+                <p>No messages yet. Start the conversation!</p>
               </div>
             )}
           </ScrollArea>
@@ -304,7 +347,7 @@ export default function VoiceAssistantPage() {
               placeholder={isRecording ? "Listening..." : "Type or click mic..."}
               required
               className="flex-grow"
-              disabled={(isLoading && !isRecording) || !user}
+              disabled={(isLoading && !isRecording) || !user || isSpeaking}
             />
             <Button
               type="button"
@@ -316,7 +359,7 @@ export default function VoiceAssistantPage() {
             >
               {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </Button>
-            <Button type="submit" disabled={isLoading || isRecording || !user || !userInput.trim()} size="icon" aria-label="Send message">
+            <Button type="submit" disabled={isLoading || isRecording || !user || !userInput.trim() || isSpeaking} size="icon" aria-label="Send message">
               {(isLoading && !isRecording) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </form>
